@@ -1,0 +1,6 @@
+{
+  "strong": "In Feature-Forge, we hit a p95 lookup latency under 4.2ms by keeping the active 2 million feature keys indexed in memory with an LRU cache, while DuckDB handled cold lookups via vectorized parquet scans. Kafka consumers partitioned events by user_id to ensure cache locality.",
+  "terse": "Used in-memory indexing with DuckDB columnar backing to keep p95 latency at 4.2ms.",
+  "confidently_wrong": "We used DeepSpeed ZeRO-3 on 16 GPUs to pretrain our 70B transformer, which directly generated tabular feature embeddings from 10 TB/day of Kafka streams.",
+  "generic": "Feature stores are essential for machine learning operations. We optimized pipelines using industry standard frameworks to achieve high throughput."
+}

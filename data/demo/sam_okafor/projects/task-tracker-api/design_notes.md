@@ -1,0 +1,1 @@
+Uses SQLite WAL mode with SQLAlchemy async engine and pool_size=10.

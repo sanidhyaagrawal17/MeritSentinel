@@ -1,0 +1,6 @@
+{
+  "strong": "In Raft-KV, we configure randomized election timeouts between 150ms and 300ms to prevent split votes. When a follower stops receiving heartbeats from the leader within this window, it transitions to candidate, increments currentTerm, votes for itself, and sends RequestVote RPCs. If it gathers votes from a majority (2 out of 3 nodes), it becomes leader.",
+  "terse": "Timeouts are 150-300ms randomized. Majority votes win leader role.",
+  "confidently_wrong": "In our Paxos consensus engine, the leader leases are managed by Kubernetes etcd and Istio ingress routers, which guarantee 100,000 req/sec write throughput across 50 nodes without election delays.",
+  "generic": "Distributed consensus is very important in modern cloud computing. We used standard industry practices to ensure high availability and robust data replication."
+}

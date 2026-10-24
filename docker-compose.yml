@@ -1,0 +1,13 @@
+services:
+  resumeproof:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - RESUMEPROOF_USE_FAKE_LLM=true
+      - RESUMEPROOF_EFFECTIVE_SCORE_THRESHOLD=2.5
+      - RESUMEPROOF_CONFIDENCE_THRESHOLD=0.5
+      - RESUMEPROOF_MAX_AGGREGATE_JUMP=1.0
+    volumes:
+      - .:/app
+    command: python -m pytest tests/ -v

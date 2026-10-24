@@ -1,0 +1,11 @@
+{
+  "model": "qwen2.5:7b",
+  "timestamp": "2026-10-24T15:08:04.411382",
+  "date": "2026-10-24",
+  "dataset": "hand_labeled_50_answers",
+  "sample_size": 50,
+  "quadratic_weighted_kappa": 0.9427,
+  "exact_agreement_rate": 0.8,
+  "mean_absolute_error": 0.2,
+  "notes": "Separate manual benchmark command. Zero network required in CI."
+}

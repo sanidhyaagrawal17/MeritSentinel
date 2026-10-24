@@ -1,0 +1,1 @@
+Feature schema enforced with Pydantic. Micro-batches committed to DuckDB columnar storage every 500ms.

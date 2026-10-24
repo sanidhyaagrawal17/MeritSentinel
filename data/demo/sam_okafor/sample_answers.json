@@ -1,0 +1,6 @@
+{
+  "strong": "In Task-Tracker API, SQLite can become a write bottleneck, so we enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
+  "terse": "Enabled WAL mode and SQLAlchemy connection pool of 10 to hit 350 req/sec.",
+  "confidently_wrong": "We used an Apache Kafka event bus and BGP scrubbing centers to stream financial transactions into our Byzantine fault-tolerant Raft cluster with zero downtime.",
+  "generic": "APIs require good database connections and error handling. We followed standard tutorials to make sure the app responded quickly."
+}

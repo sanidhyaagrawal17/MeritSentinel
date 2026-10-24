@@ -1,0 +1,32 @@
+{
+  "supported": [
+    {
+      "claim": "Streamed feature vectors achieving p95 lookup latency under 4.2ms across 2 million customer keys",
+      "category": "project_metric"
+    },
+    {
+      "claim": "Improved classification AUC-ROC from 0.81 to 0.88 using LightGBM",
+      "category": "project_metric"
+    }
+  ],
+  "partial": [
+    {
+      "claim": "Processed 10 TB/day of streaming telemetry logs",
+      "ground_truth": "Actual verified volume was 2.5 TB/day."
+    },
+    {
+      "claim": "Distributed training across 16 GPUs using PyTorch FSDP",
+      "ground_truth": "Only tested on 2 GPUs locally."
+    }
+  ],
+  "unsupported": [
+    {
+      "claim": "Trained 70B parameter LLM from scratch using DeepSpeed",
+      "ground_truth": "No LLM training; project was strictly tabular LightGBM and PyTorch."
+    },
+    {
+      "claim": "Fine-tuned custom diffusion models for image synthesis",
+      "ground_truth": "No diffusion models or computer vision in portfolio."
+    }
+  ]
+}

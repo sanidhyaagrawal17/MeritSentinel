@@ -1,0 +1,32 @@
+{
+  "supported": [
+    {
+      "claim": "Raft leader election election timeout of 150-300ms maintaining 99.99% linearizability",
+      "category": "project_metric"
+    },
+    {
+      "claim": "Engineered crash-resilient write-ahead logger with p99 fsync latency of 1.13ms using O_DIRECT",
+      "category": "project_metric"
+    }
+  ],
+  "partial": [
+    {
+      "claim": "Handled 100,000 req/sec write throughput under benchmark",
+      "ground_truth": "Actual verified maximum was 45,000 req/sec."
+    },
+    {
+      "claim": "Zero packet loss under split-brain network partition across any cluster size",
+      "ground_truth": "Only verified on 3-node cluster; packet loss occurs during uncommitted leader partition."
+    }
+  ],
+  "unsupported": [
+    {
+      "claim": "Built Paxos consensus engine",
+      "ground_truth": "Never implemented Paxos; only Raft was used."
+    },
+    {
+      "claim": "Migrated infrastructure to Kubernetes with Istio service mesh",
+      "ground_truth": "No Kubernetes or Istio in any project doc or code."
+    }
+  ]
+}

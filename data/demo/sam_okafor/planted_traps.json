@@ -1,0 +1,32 @@
+{
+  "supported": [
+    {
+      "claim": "FastAPI REST API with SQLite connection pooling sustaining 350 concurrent read req/sec",
+      "category": "project_metric"
+    },
+    {
+      "claim": "Recursive UDP DNS resolver resolving queries in under 45ms for cached records",
+      "category": "project_metric"
+    }
+  ],
+  "partial": [
+    {
+      "claim": "Built enterprise microservices architecture supporting millions of global enterprise users",
+      "ground_truth": "Only a single small FastAPI app with SQLite."
+    },
+    {
+      "claim": "Prevented enterprise-level DDoS attacks using automated BGP route scrubbing",
+      "ground_truth": "No BGP or DDoS prevention; just a local DNS script."
+    }
+  ],
+  "unsupported": [
+    {
+      "claim": "Architected Apache Kafka event bus for financial transaction settlement",
+      "ground_truth": "No Kafka or financial transactions in project."
+    },
+    {
+      "claim": "Designed distributed Raft consensus cluster with Byzantine fault tolerance",
+      "ground_truth": "No Raft or Byzantine consensus; junior student project."
+    }
+  ]
+}

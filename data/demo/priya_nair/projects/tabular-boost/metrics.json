@@ -1,0 +1,1 @@
+{"auc_baseline": 0.81, "auc_final": 0.88, "inference_speedup_x": 3.4, "gpus_tested": 2}

@@ -1,0 +1,1 @@
+Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.

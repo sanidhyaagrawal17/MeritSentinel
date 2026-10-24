@@ -1,0 +1,1 @@
+Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.
