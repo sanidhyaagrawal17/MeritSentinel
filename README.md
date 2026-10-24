@@ -84,3 +84,29 @@ pytest tests/ -v
 ```bash
 python scripts/run_manual_benchmark.py --model qwen2.5:7b --output results/benchmark_qwen2.5_7b.json
 ```
+
+---
+
+## Benchmark Policy & Measurement Ground Rules
+
+- **Zero Synthetic Claims in Results**: `results/placeholder_benchmark_format.json` is strictly a schema format stub. No synthetic or simulated runs are permitted to produce committed numbers in `results/`.
+- Only real measured runs with Ollama against human-verified ground-truth labels (such as `data/grader_validation/labeling_sheet.csv`) may produce committed JSON reports in `results/`.
+
+---
+
+## Mastery Calibration & Threshold Sensitivity
+
+> **Note on Calibration Data**: The calibration counts below use scripted simulated scores across Day 0, Day 3, and Day 7 to analyze mathematical boundary sensitivity under half-life decay. These will be re-measured with real grader output once the human-labeled validation set is completed.
+
+### Configuration Sensitivity Analysis (Realistic Day Gaps: 0, 3, 7 days)
+
+Under exponential half-life decay ($T_{half} = 30$ days), an answer given on Day 0 has weight $0.5^{3/30} = 0.933$ on Day 3. Consequently, two answers on Day 3 yield $n_{eff} = 1.933 < 2.0$.
+
+| Configuration | Parameters | Day 0 (1 ans) | Day 3 (2 ans) | Day 7 (3 ans) | Behavior / Tradeoff |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Config 1 (Current)** | $\text{conf} \ge 0.50$, $k = 2.0$ | 0 / 7 | 0 / 7 | 5 / 7 | Rigid boundary: $n_{eff} = 1.933 \implies \text{conf} = 0.4915 < 0.50$. Requires 3 answers before any claim is eligible. |
+| **Config 2** | $\text{conf} \ge 0.45$, $k = 2.0$ | 0 / 7 | 5 / 7 | 5 / 7 | Tolerates realistic inter-turn decay ($\text{conf} = 0.4915 \ge 0.45$). Admits supported claims on 2nd answer; traps remain blocked. |
+| **Config 3** | $\text{conf} \ge 0.50$, $k = 1.5$ | 0 / 7 | 5 / 7 | 5 / 7 | Faster Bayesian confidence acquisition ($\text{conf} = 1.933 / (1.933 + 1.5) = 0.5630 \ge 0.50$). Admits supported claims on 2nd answer; traps remain blocked. |
+
+Tolerance: All threshold checks implement a small numerical tolerance ($10^{-4}$) to prevent floating-point boundary artifacts.
+

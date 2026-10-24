@@ -81,9 +81,64 @@ CREATE TABLE IF NOT EXISTS mastery_states (
     FOREIGN KEY(claim_id) REFERENCES claims(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS rubrics (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    persona_id TEXT,
+    topic TEXT NOT NULL,
+    source_file TEXT NOT NULL,
+    source_line INTEGER NOT NULL,
+    source_quote TEXT NOT NULL,
+    criteria TEXT NOT NULL, -- JSON dict of 0-4 scoring anchors
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS interview_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    persona_id TEXT,
+    budget INTEGER NOT NULL,
+    total_questions INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS session_turns (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    turn_index INTEGER NOT NULL,
+    claim_id TEXT NOT NULL,
+    question_id TEXT NOT NULL,
+    question_text TEXT NOT NULL,
+    answer_text TEXT NOT NULL,
+    raw_score INTEGER,
+    evidence_quote TEXT,
+    rubric_reference TEXT,
+    feedback TEXT,
+    is_followup INTEGER NOT NULL DEFAULT 0,
+    turn_latency_ms REAL NOT NULL DEFAULT 0.0,
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY(session_id) REFERENCES interview_sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY(claim_id) REFERENCES claims(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS grading_cache (
+    cache_key TEXT PRIMARY KEY,
+    raw_score INTEGER NOT NULL,
+    evidence_quote TEXT NOT NULL,
+    rubric_reference TEXT,
+    feedback TEXT NOT NULL,
+    model TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_claims_user ON claims(user_id);
 CREATE INDEX IF NOT EXISTS idx_profile_facts_user ON profile_facts(user_id);
 CREATE INDEX IF NOT EXISTS idx_answers_claim ON answer_records(claim_id);
+CREATE INDEX IF NOT EXISTS idx_rubrics_project ON rubrics(project_id);
+CREATE INDEX IF NOT EXISTS idx_turns_session ON session_turns(session_id);
+CREATE INDEX IF NOT EXISTS idx_turns_claim ON session_turns(claim_id);
 """
 
 class Database:

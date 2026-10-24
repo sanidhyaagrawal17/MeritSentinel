@@ -35,7 +35,7 @@ class Claim(BaseModel):
     user_id: str = "default_user"
     persona_id: Optional[str] = None
     project_id: Optional[str] = None
-    claim_type: ClaimType
+    claim_type: ClaimType = ClaimType.PROJECT_METRIC
     text: str
     tools: list[str] = Field(default_factory=list)
     metric_values: list[str] = Field(default_factory=list)

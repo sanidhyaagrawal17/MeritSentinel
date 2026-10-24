@@ -15,6 +15,7 @@ def compute_mastery_state(
     half_life_days: float | None = None,
     prior_score: float | None = None,
     prior_weight: float | None = None,
+    tolerance: float = 1e-4,
 ) -> MasteryState:
     """Computes the updated mastery state given all answers for a claim.
 
@@ -106,8 +107,11 @@ def compute_mastery_state(
     rounded_effective = round(effective_score, 4)
     rounded_confidence = round(confidence, 4)
     rounded_neff = round(n_eff, 4)
-
-    is_eligible = (rounded_effective >= effective_threshold) and (rounded_confidence >= confidence_threshold)
+    # Apply small tolerance (1e-4) to prevent boundary artifacts on threshold checks
+    is_eligible = (
+        (effective_score >= (effective_threshold - tolerance)) and
+        (confidence >= (confidence_threshold - tolerance))
+    )
 
     return MasteryState(
         claim_id=claim_id,

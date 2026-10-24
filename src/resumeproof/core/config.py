@@ -42,6 +42,10 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("RESUMEPROOF_OLLAMA_BASE_URL", "http://localhost:11434"),
         description="Base URL for Ollama or OpenAI-compatible server"
     )
+    extractor_model: str = Field(
+        default_factory=lambda: os.getenv("RESUMEPROOF_EXTRACTOR_MODEL", "qwen2.5:3b"),
+        description="Model name for structured claim extraction"
+    )
     interviewer_model: str = Field(
         default_factory=lambda: os.getenv("RESUMEPROOF_INTERVIEWER_MODEL", "qwen2.5:3b"),
         description="Model name for question generation and chat"

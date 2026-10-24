@@ -51,3 +51,26 @@ def test_cli_extract_interactive_confirm_and_edit(tmp_path, monkeypatch):
     assert "STAGE 1: PROFILE FACTS REVIEW" in result.output
     assert "STAGE 2: MASTERY CLAIMS REVIEW" in result.output
     assert "Review complete! All facts and claims saved to SQLite." in result.output
+
+def test_cli_interview_auto_answer(tmp_path, monkeypatch):
+    test_db = tmp_path / "cli_interview.db"
+    monkeypatch.setenv("RESUMEPROOF_DB_PATH", str(test_db))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "interview",
+        "--persona", "sam_okafor",
+        "--budget", "3",
+        "--auto-answer",
+        "--fake-llm",
+    ])
+
+    assert result.exit_code == 0
+    assert "RESUMEPROOF ADAPTIVE INTERVIEW SESSION: sam_okafor" in result.output
+    assert "Registered" in result.output and "grounded rubric items" in result.output
+    assert "TURN 1/3" in result.output
+    assert "TURN 2/3" in result.output
+    assert "TURN 3/3" in result.output
+    assert "Grade:" in result.output
+    assert "INTERVIEW TRANSCRIPT SUMMARY" in result.output
+    assert "Total Turns Completed: 3" in result.output

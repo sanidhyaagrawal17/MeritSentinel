@@ -7,5 +7,5 @@
   "quadratic_weighted_kappa": 0.9427,
   "exact_agreement_rate": 0.8,
   "mean_absolute_error": 0.2,
-  "notes": "Separate manual benchmark command. Zero network required in CI."
+  "notes": "PLACEHOLDER FORMAT ONLY: Synthetically generated format stub. Only real measured runs against verified human labels may produce official numbers in results/."
 }

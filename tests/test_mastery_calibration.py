@@ -115,3 +115,105 @@ def test_configurable_threshold_sensitivity():
     )
     # Effective score is 2.5 < 3.0, so it is blocked!
     assert strict_state.is_eligible is False
+
+def test_realistic_day_gaps_and_config_comparison():
+    """Calibration tests with answers spread over realistic gaps (Day 0, Day 3, Day 7).
+
+    Evaluates and records eligible-claim counts across 3 configurations:
+    - Config 1: Current default (conf >= 0.5, k = 2.0)
+    - Config 2: Slightly lowered confidence threshold (conf >= 0.45, k = 2.0)
+    - Config 3: Lowered prior weight / faster confidence acquisition (conf >= 0.5, k = 1.5)
+    """
+    client = FakeLLMClient()
+    personas = ["alex_rivera", "priya_nair", "sam_okafor"]
+
+    configs = {
+        "Config 1 (current: conf>=0.5, k=2.0)": {"conf": 0.5, "k": 2.0},
+        "Config 2 (conf>=0.45, k=2.0)": {"conf": 0.45, "k": 2.0},
+        "Config 3 (conf>=0.5, k=1.5)": {"conf": 0.5, "k": 1.5},
+    }
+
+    now = datetime.now(timezone.utc)
+    t_day0 = now
+    t_day3 = now + timedelta(days=3)
+    t_day7 = now + timedelta(days=7)
+
+    results = {}
+
+    for cfg_name, cfg in configs.items():
+        conf_thresh = cfg["conf"]
+        k_prior = cfg["k"]
+        results[cfg_name] = {}
+
+        for persona in personas:
+            parsed = parse_resume(DEMO_DIR / persona / "resume.pdf")
+            facts, claims = extract_from_resume(parsed, client, persona_id=persona)
+
+            el_day0 = 0
+            el_day3 = 0
+            el_day7 = 0
+
+            for claim in claims:
+                txt = claim.text.lower()
+                if any(k in txt for k in ["paxos", "70b", "byzantine"]):
+                    scores = [0, 0, 1]  # Unsupported trap
+                elif any(k in txt for k in ["ddos", "microservices", "100,000", "10 tb"]):
+                    scores = [2, 2, 2]  # Partial claim
+                else:
+                    scores = [4, 4, 4]  # Supported claim
+
+                # Day 0: 1 answer
+                ans1 = AnswerRecord(id=f"{claim.id}_a1", claim_id=claim.id, raw_score=scores[0], timestamp=t_day0)
+                s1 = compute_mastery_state(
+                    claim.id, [ans1], evaluation_time=t_day0,
+                    confidence_threshold=conf_thresh, prior_weight=k_prior
+                )
+                if s1.is_eligible:
+                    el_day0 += 1
+
+                # Day 3: 2 answers (Day 0 + Day 3)
+                ans2 = AnswerRecord(id=f"{claim.id}_a2", claim_id=claim.id, raw_score=scores[1], timestamp=t_day3)
+                s2 = compute_mastery_state(
+                    claim.id, [ans1, ans2], previous_state=s1, evaluation_time=t_day3,
+                    confidence_threshold=conf_thresh, prior_weight=k_prior
+                )
+                if s2.is_eligible:
+                    el_day3 += 1
+
+                # Day 7: 3 answers (Day 0 + Day 3 + Day 7)
+                ans3 = AnswerRecord(id=f"{claim.id}_a3", claim_id=claim.id, raw_score=scores[2], timestamp=t_day7)
+                s3 = compute_mastery_state(
+                    claim.id, [ans1, ans2, ans3], previous_state=s2, evaluation_time=t_day7,
+                    confidence_threshold=conf_thresh, prior_weight=k_prior
+                )
+                if s3.is_eligible:
+                    el_day7 += 1
+
+            results[cfg_name][persona] = {
+                "total": len(claims),
+                "day0": el_day0,
+                "day3": el_day3,
+                "day7": el_day7,
+            }
+
+            # Invariant: Day 0 (1 answer) must never make any claim eligible across all configs
+            assert el_day0 == 0
+
+            # Invariant: Unsupported traps must remain blocked at Day 7 across all configs
+            assert el_day7 < len(claims)
+
+    # Specific behavior verification:
+    # Under Config 1 (current), a 3-day gap pushes n_eff to ~1.933 < 2.0, so confidence < 0.50 (Day 3 yields 0)
+    for p in personas:
+        assert results["Config 1 (current: conf>=0.5, k=2.0)"][p]["day3"] == 0
+        assert results["Config 1 (current: conf>=0.5, k=2.0)"][p]["day7"] == 5
+
+    # Under Config 2 (conf >= 0.45), 2 answers with 3-day gap yield confidence ~0.4915 >= 0.45, so 5 become eligible on Day 3
+    for p in personas:
+        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day3"] == 5
+        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day7"] == 5
+
+    # Under Config 3 (k = 1.5), 2 answers with 3-day gap yield confidence ~0.5630 >= 0.50, so 5 become eligible on Day 3
+    for p in personas:
+        assert results["Config 3 (conf>=0.5, k=1.5)"][p]["day3"] == 5
+        assert results["Config 3 (conf>=0.5, k=1.5)"][p]["day7"] == 5

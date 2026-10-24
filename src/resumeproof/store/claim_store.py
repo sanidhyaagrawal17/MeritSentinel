@@ -239,6 +239,11 @@ class ClaimStore:
                 )
             )
 
+    def get_claim(self, claim_id: str) -> Optional[Claim]:
+        with self.db.transaction() as conn:
+            r = conn.execute("SELECT * FROM claims WHERE id = ?", (claim_id,)).fetchone()
+            return self._hydrate_claim(r, conn) if r else None
+
     def get_claims(
         self,
         user_id: str,
@@ -283,7 +288,7 @@ class ClaimStore:
         with self.db.transaction() as conn:
             conn.execute(
                 """
-                INSERT INTO answer_records (
+                INSERT OR REPLACE INTO answer_records (
                     id, claim_id, question_id, raw_score, evidence_quote, feedback, timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -352,15 +357,34 @@ class ClaimStore:
                 for r in rows
             ]
 
-    def get_eligible_claims(self, user_id: str) -> list[Claim]:
-        """Returns only claims whose current mastery state meets the eligibility threshold."""
+    def get_eligible_claims(
+        self,
+        user_id: str,
+        effective_threshold: float | None = None,
+        confidence_threshold: float | None = None,
+        tolerance: float = 1e-4,
+    ) -> list[Claim]:
+        """Returns claims meeting mastery eligibility thresholds with small tolerance comparison."""
         with self.db.transaction() as conn:
-            rows = conn.execute(
-                """
-                SELECT c.* FROM claims c
-                JOIN mastery_states m ON c.id = m.claim_id
-                WHERE c.user_id = ? AND m.is_eligible = 1
-                """,
-                (user_id,)
-            ).fetchall()
+            if effective_threshold is not None or confidence_threshold is not None:
+                from resumeproof.core.config import settings
+                eff_t = (effective_threshold if effective_threshold is not None else settings.effective_score_threshold) - tolerance
+                conf_t = (confidence_threshold if confidence_threshold is not None else settings.confidence_threshold) - tolerance
+                rows = conn.execute(
+                    """
+                    SELECT c.* FROM claims c
+                    JOIN mastery_states m ON c.id = m.claim_id
+                    WHERE c.user_id = ? AND m.effective_score >= ? AND m.confidence >= ?
+                    """,
+                    (user_id, eff_t, conf_t)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT c.* FROM claims c
+                    JOIN mastery_states m ON c.id = m.claim_id
+                    WHERE c.user_id = ? AND m.is_eligible = 1
+                    """,
+                    (user_id,)
+                ).fetchall()
             return [self._hydrate_claim(r, conn) for r in rows]
