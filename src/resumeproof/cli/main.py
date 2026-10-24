@@ -46,68 +46,71 @@ def extract_cmd(resume: str, user: str, persona: str | None, auto_confirm: bool,
     click.echo(f"==> Extracted {len(facts)} profile facts and {len(claims)} mastery claims.\n")
 
     db = Database(settings.db_path)
-    store = ClaimStore(db)
-    session = ReviewSession(store)
+    try:
+        store = ClaimStore(db)
+        session = ReviewSession(store)
 
-    if auto_confirm:
-        click.echo("==> Auto-confirming all facts and claims...")
-        rev_facts, rev_claims = session.run_batch_review(facts, claims, auto_confirm_all=True)
-        click.echo(f"==> Successfully stored {len(rev_facts)} profile facts and {len(rev_claims)} claims in SQLite.")
-        return
+        if auto_confirm:
+            click.echo("==> Auto-confirming all facts and claims...")
+            rev_facts, rev_claims = session.run_batch_review(facts, claims, auto_confirm_all=True)
+            click.echo(f"==> Successfully stored {len(rev_facts)} profile facts and {len(rev_claims)} claims in SQLite.")
+            return
 
-    # Interactive Review Step
-    click.echo("=" * 60)
-    click.echo("STAGE 1: PROFILE FACTS REVIEW (Not interview-gated)")
-    click.echo("=" * 60)
+        # Interactive Review Step
+        click.echo("=" * 60)
+        click.echo("STAGE 1: PROFILE FACTS REVIEW (Not interview-gated)")
+        click.echo("=" * 60)
 
-    for idx, fact in enumerate(facts, start=1):
-        click.echo(f"\n[{idx}/{len(facts)}] {fact.fact_type.value.upper()}: {fact.value} (Line: {fact.source_line})")
-        choice = click.prompt("Action: [c]onfirm, [e]dit, [r]eject", type=click.Choice(["c", "e", "r"]), default="c")
-        if choice == "c":
-            session.review_profile_fact(fact, confirm=True)
-            click.secho("Confirmed.", fg="green")
-        elif choice == "e":
-            new_val = click.prompt("Enter corrected value", default=fact.value)
-            session.review_profile_fact(fact, confirm=True, correction=new_val)
-            click.secho(f"Edited and confirmed: {new_val}", fg="yellow")
-        else:
-            session.review_profile_fact(fact, confirm=False)
-            click.secho("Rejected.", fg="red")
+        for idx, fact in enumerate(facts, start=1):
+            click.echo(f"\n[{idx}/{len(facts)}] {fact.fact_type.value.upper()}: {fact.value} (Line: {fact.source_line})")
+            choice = click.prompt("Action: [c]onfirm, [e]dit, [r]eject", type=click.Choice(["c", "e", "r"]), default="c")
+            if choice == "c":
+                session.review_profile_fact(fact, confirm=True)
+                click.secho("Confirmed.", fg="green")
+            elif choice == "e":
+                new_val = click.prompt("Enter corrected value", default=fact.value)
+                session.review_profile_fact(fact, confirm=True, correction=new_val)
+                click.secho(f"Edited and confirmed: {new_val}", fg="yellow")
+            else:
+                session.review_profile_fact(fact, confirm=False)
+                click.secho("Rejected.", fg="red")
 
-    click.echo("\n" + "=" * 60)
-    click.echo("STAGE 2: MASTERY CLAIMS REVIEW (Interview-gated)")
-    click.echo("=" * 60)
+        click.echo("\n" + "=" * 60)
+        click.echo("STAGE 2: MASTERY CLAIMS REVIEW (Interview-gated)")
+        click.echo("=" * 60)
 
-    for idx, claim in enumerate(claims, start=1):
-        click.echo(f"\n[{idx}/{len(claims)}] {claim.claim_type.value.upper()} (Line: {claim.source_line})")
-        click.echo(f"  Statement: {claim.text}")
-        if claim.tools:
-            click.echo(f"  Tools: {', '.join(claim.tools)}")
-        if claim.metric_values:
-            click.echo(f"  Metrics: {', '.join(claim.metric_values)}")
+        for idx, claim in enumerate(claims, start=1):
+            click.echo(f"\n[{idx}/{len(claims)}] {claim.claim_type.value.upper()} (Line: {claim.source_line})")
+            click.echo(f"  Statement: {claim.text}")
+            if claim.tools:
+                click.echo(f"  Tools: {', '.join(claim.tools)}")
+            if claim.metric_values:
+                click.echo(f"  Metrics: {', '.join(claim.metric_values)}")
 
-        choice = click.prompt("Action: [c]onfirm, [e]dit, [r]eject", type=click.Choice(["c", "e", "r"]), default="c")
-        if choice == "c":
-            session.review_claim(claim, ReviewDecision(action=ClaimStatus.CONFIRMED))
-            click.secho("Confirmed into claim store.", fg="green")
-        elif choice == "e":
-            new_text = click.prompt("Corrected text", default=claim.text)
-            tools_str = click.prompt("Tools (comma-separated)", default=", ".join(claim.tools))
-            metrics_str = click.prompt("Metrics (comma-separated)", default=", ".join(claim.metric_values))
-            new_tools = [t.strip() for t in tools_str.split(",") if t.strip()]
-            new_metrics = [m.strip() for m in metrics_str.split(",") if m.strip()]
-            session.review_claim(claim, ReviewDecision(
-                action=ClaimStatus.EDITED,
-                user_text=new_text,
-                user_tools=new_tools,
-                user_metrics=new_metrics
-            ))
-            click.secho("Edited claim saved with full audit trail.", fg="yellow")
-        else:
-            session.review_claim(claim, ReviewDecision(action=ClaimStatus.REJECTED))
-            click.secho("Rejected claim (excluded from interview pool).", fg="red")
+            choice = click.prompt("Action: [c]onfirm, [e]dit, [r]eject", type=click.Choice(["c", "e", "r"]), default="c")
+            if choice == "c":
+                session.review_claim(claim, ReviewDecision(action=ClaimStatus.CONFIRMED))
+                click.secho("Confirmed into claim store.", fg="green")
+            elif choice == "e":
+                new_text = click.prompt("Corrected text", default=claim.text)
+                tools_str = click.prompt("Tools (comma-separated)", default=", ".join(claim.tools))
+                metrics_str = click.prompt("Metrics (comma-separated)", default=", ".join(claim.metric_values))
+                new_tools = [t.strip() for t in tools_str.split(",") if t.strip()]
+                new_metrics = [m.strip() for m in metrics_str.split(",") if m.strip()]
+                session.review_claim(claim, ReviewDecision(
+                    action=ClaimStatus.EDITED,
+                    user_text=new_text,
+                    user_tools=new_tools,
+                    user_metrics=new_metrics
+                ))
+                click.secho("Edited claim saved with full audit trail.", fg="yellow")
+            else:
+                session.review_claim(claim, ReviewDecision(action=ClaimStatus.REJECTED))
+                click.secho("Rejected claim (excluded from interview pool).", fg="red")
 
-    click.echo("\n==> Review complete! All facts and claims saved to SQLite.")
+        click.echo("\n==> Review complete! All facts and claims saved to SQLite.")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     cli()

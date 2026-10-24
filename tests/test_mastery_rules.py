@@ -105,3 +105,35 @@ def test_half_life_time_decay():
     assert abs(state.n_effective - 0.5) < 0.01
     # Confidence: 0.5 / (0.5 + 2) = 0.2
     assert abs(state.confidence - 0.2) < 0.01
+
+def test_batch_replay_matches_sequential_execution():
+    claim_id = "claim_replay"
+    now = datetime.now(timezone.utc)
+    ans1 = AnswerRecord(id="a1", claim_id=claim_id, raw_score=4, timestamp=now)
+    ans2 = AnswerRecord(id="a2", claim_id=claim_id, raw_score=4, timestamp=now + timedelta(minutes=5))
+
+    # Sequential execution:
+    # 1st answer jumps aggregate from prior 2.0 to capped 3.0
+    state1 = compute_mastery_state(claim_id=claim_id, answers=[ans1], evaluation_time=now)
+    assert state1.aggregate_score == 3.0
+    # 2nd answer jumps aggregate from 3.0 to capped 4.0
+    state2 = compute_mastery_state(
+        claim_id=claim_id,
+        answers=[ans1, ans2],
+        previous_state=state1,
+        evaluation_time=now + timedelta(minutes=5)
+    )
+    assert state2.aggregate_score == 4.0
+
+    # Batch replay from scratch (e.g. database reload without in-memory state):
+    # Evaluates per new answer sequentially and MUST produce the exact same aggregate score 4.0
+    replayed_state = compute_mastery_state(
+        claim_id=claim_id,
+        answers=[ans1, ans2],
+        previous_state=None,
+        evaluation_time=now + timedelta(minutes=5)
+    )
+    assert replayed_state.aggregate_score == state2.aggregate_score
+    assert replayed_state.effective_score == state2.effective_score
+    assert replayed_state.confidence == state2.confidence
+    assert replayed_state.is_eligible == state2.is_eligible

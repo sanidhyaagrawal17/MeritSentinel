@@ -56,29 +56,46 @@ def compute_mastery_state(
     # Sort answers chronologically
     sorted_answers = sorted(answers, key=lambda a: a.timestamp)
 
-    # Calculate weighted sum with half-life decay
-    total_weight = 0.0
-    weighted_score_sum = 0.0
+    # Determine starting aggregate and answer index for incremental jump-capping
+    if previous_state is not None:
+        if 0 < previous_state.total_answers < len(sorted_answers):
+            start_idx = previous_state.total_answers
+        elif previous_state.total_answers == 0 and len(sorted_answers) > 1 and previous_state.aggregate_score != prior_score:
+            start_idx = len(sorted_answers) - 1
+        elif previous_state.total_answers >= len(sorted_answers):
+            start_idx = len(sorted_answers)
+        else:
+            start_idx = 0
+        current_agg = previous_state.aggregate_score
+    else:
+        start_idx = 0
+        current_agg = prior_score
 
+    # Apply max_jump cap (1.0) sequentially per new answer
+    for k in range(start_idx, len(sorted_answers)):
+        sub_answers = sorted_answers[: k + 1]
+        eval_t = sub_answers[-1].timestamp
+        sub_weights = [
+            0.5 ** (max(0.0, (eval_t - a.timestamp).total_seconds() / 86400.0) / half_life_days)
+            for a in sub_answers
+        ]
+        total_sub_w = sum(sub_weights)
+        uncapped_k = sum(w * float(a.raw_score) for w, a in zip(sub_weights, sub_answers)) / max(1e-8, total_sub_w)
+        delta_k = uncapped_k - current_agg
+        if abs(delta_k) > max_jump:
+            current_agg += max_jump if delta_k > 0 else -max_jump
+        else:
+            current_agg = uncapped_k
+        current_agg = max(0.0, min(4.0, current_agg))
+
+    capped_aggregate = current_agg
+
+    # Calculate total weight and n_effective at the target evaluation time
+    total_weight = 0.0
     for a in sorted_answers:
         age_days = max(0.0, (now - a.timestamp).total_seconds() / 86400.0)
         w = 0.5 ** (age_days / half_life_days)
         total_weight += w
-        weighted_score_sum += w * float(a.raw_score)
-
-    uncapped_aggregate = weighted_score_sum / max(1e-8, total_weight)
-
-    # Apply 1.0 jump cap to the change in aggregate score per new answer
-    prev_agg = previous_state.aggregate_score if previous_state is not None else prior_score
-    delta = uncapped_aggregate - prev_agg
-
-    if abs(delta) > max_jump:
-        capped_aggregate = prev_agg + (max_jump if delta > 0 else -max_jump)
-    else:
-        capped_aggregate = uncapped_aggregate
-
-    # Clamp aggregate score to valid range [0.0, 4.0]
-    capped_aggregate = max(0.0, min(4.0, capped_aggregate))
 
     # Calculate confidence and Bayesian shrinkage effective score
     n_eff = total_weight

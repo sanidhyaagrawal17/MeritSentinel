@@ -24,8 +24,10 @@ def quadratic_weighted_kappa(
     # Build confusion matrix O
     observed = [[0.0] * k for _ in range(k)]
     for a, b in zip(rater_a, rater_b):
-        idx_a = max(0, min(k - 1, a - min_rating))
-        idx_b = max(0, min(k - 1, b - min_rating))
+        if not (min_rating <= a <= max_rating) or not (min_rating <= b <= max_rating):
+            raise ValueError(f"Ratings must be between {min_rating} and {max_rating}, got ({a}, {b})")
+        idx_a = a - min_rating
+        idx_b = b - min_rating
         observed[idx_a][idx_b] += 1.0
 
     # Marginals

@@ -31,12 +31,19 @@ class ProfileFact(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def allowed_tokens(self) -> set[str]:
-        """Returns normalized tokens allowed by this profile fact."""
+        """Returns normalized tokens allowed by this profile fact.
+
+        Invariant: Profile facts only grant allowed tokens once user-confirmed during onboarding.
+        Unconfirmed facts must yield an empty token set.
+        """
+        if not self.is_confirmed:
+            return set()
+
         val = self.user_correction or self.value
         # Split on whitespace and punctuation for basic tokenization
         tokens = set()
         cleaned = "".join(c if c.isalnum() or c in ("-", ".", "@", "/") else " " for c in val.lower())
         for part in cleaned.split():
-            if len(part) > 1:
+            if len(part) > 1 or part.isdigit():
                 tokens.add(part)
         return tokens

@@ -9,12 +9,16 @@ from resumeproof.review.flow import ReviewSession
 @pytest.fixture
 def memory_db():
     """In-memory SQLite database for isolated unit tests."""
-    return Database(":memory:")
+    db = Database(":memory:")
+    yield db
+    db.close()
 
 @pytest.fixture
 def claim_store(memory_db):
     """Claim store backed by in-memory SQLite database."""
-    return ClaimStore(memory_db)
+    store = ClaimStore(memory_db)
+    yield store
+    store.close()
 
 @pytest.fixture
 def review_session(claim_store):

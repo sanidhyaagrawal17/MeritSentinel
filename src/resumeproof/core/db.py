@@ -128,5 +128,17 @@ class Database:
 
     def close(self) -> None:
         if self._shared_conn is not None:
-            self._shared_conn.close()
+            try:
+                self._shared_conn.close()
+            except Exception:
+                pass
             self._shared_conn = None
+
+    def __enter__(self) -> "Database":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        self.close()

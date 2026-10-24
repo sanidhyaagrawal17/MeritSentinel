@@ -12,6 +12,48 @@ class ClaimStore:
     def __init__(self, db: Database):
         self.db = db
 
+    def close(self) -> None:
+        self.db.close()
+
+    def __enter__(self) -> "ClaimStore":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+    def _hydrate_claim(self, r, conn) -> Claim:
+        audit_row = conn.execute("SELECT * FROM claim_audits WHERE claim_id = ?", (r["id"],)).fetchone()
+        audit = None
+        if audit_row:
+            audit = ClaimAudit(
+                extractor_text=audit_row["extractor_text"],
+                extractor_tools=json.loads(audit_row["extractor_tools"]),
+                extractor_metrics=json.loads(audit_row["extractor_metrics"]),
+                user_correction_text=audit_row["user_correction_text"],
+                user_correction_tools=json.loads(audit_row["user_correction_tools"]) if audit_row["user_correction_tools"] else None,
+                user_correction_metrics=json.loads(audit_row["user_correction_metrics"]) if audit_row["user_correction_metrics"] else None,
+                action_taken=ClaimStatus(audit_row["action_taken"]),
+                reviewed_at=datetime.fromisoformat(audit_row["reviewed_at"]),
+                notes=audit_row["notes"]
+            )
+
+        return Claim(
+            id=r["id"],
+            user_id=r["user_id"],
+            persona_id=r["persona_id"],
+            project_id=r["project_id"],
+            claim_type=ClaimType(r["claim_type"]),
+            text=r["text"],
+            tools=json.loads(r["tools"]),
+            metric_values=json.loads(r["metric_values"]),
+            source_line=r["source_line"],
+            source_page=r["source_page"],
+            raw_sentence=r["raw_sentence"],
+            status=ClaimStatus(r["status"]),
+            audit=audit,
+            created_at=datetime.fromisoformat(r["created_at"])
+        )
+
     # ---------------- Profile Facts (Category 1: Not interview-gated) ----------------
 
     def save_profile_fact(self, fact: ProfileFact) -> None:
@@ -157,9 +199,20 @@ class ClaimStore:
             if not claim_row:
                 raise ValueError(f"Claim with id {claim_id} not found.")
 
+            new_text = user_correction_text if user_correction_text is not None else claim_row["text"]
+            new_tools = json.dumps(user_correction_tools) if user_correction_tools is not None else claim_row["tools"]
+            new_metrics = json.dumps(user_correction_metrics) if user_correction_metrics is not None else claim_row["metric_values"]
+
             conn.execute(
-                "UPDATE claims SET status = ? WHERE id = ?",
-                (action.value, claim_id)
+                """
+                UPDATE claims
+                SET status = ?,
+                    text = ?,
+                    tools = ?,
+                    metric_values = ?
+                WHERE id = ?
+                """,
+                (action.value, new_text, new_tools, new_metrics, claim_id)
             )
 
             # Update or create audit log
@@ -205,40 +258,7 @@ class ClaimStore:
 
         with self.db.transaction() as conn:
             rows = conn.execute(query, params).fetchall()
-            claims: list[Claim] = []
-            for r in rows:
-                audit_row = conn.execute("SELECT * FROM claim_audits WHERE claim_id = ?", (r["id"],)).fetchone()
-                audit = None
-                if audit_row:
-                    audit = ClaimAudit(
-                        extractor_text=audit_row["extractor_text"],
-                        extractor_tools=json.loads(audit_row["extractor_tools"]),
-                        extractor_metrics=json.loads(audit_row["extractor_metrics"]),
-                        user_correction_text=audit_row["user_correction_text"],
-                        user_correction_tools=json.loads(audit_row["user_correction_tools"]) if audit_row["user_correction_tools"] else None,
-                        user_correction_metrics=json.loads(audit_row["user_correction_metrics"]) if audit_row["user_correction_metrics"] else None,
-                        action_taken=ClaimStatus(audit_row["action_taken"]),
-                        reviewed_at=datetime.fromisoformat(audit_row["reviewed_at"]),
-                        notes=audit_row["notes"]
-                    )
-
-                claims.append(Claim(
-                    id=r["id"],
-                    user_id=r["user_id"],
-                    persona_id=r["persona_id"],
-                    project_id=r["project_id"],
-                    claim_type=ClaimType(r["claim_type"]),
-                    text=r["text"],
-                    tools=json.loads(r["tools"]),
-                    metric_values=json.loads(r["metric_values"]),
-                    source_line=r["source_line"],
-                    source_page=r["source_page"],
-                    raw_sentence=r["raw_sentence"],
-                    status=ClaimStatus(r["status"]),
-                    audit=audit,
-                    created_at=datetime.fromisoformat(r["created_at"])
-                ))
-            return claims
+            return [self._hydrate_claim(r, conn) for r in rows]
 
     def get_audit_trail(self, claim_id: str) -> Optional[ClaimAudit]:
         with self.db.transaction() as conn:
@@ -343,22 +363,4 @@ class ClaimStore:
                 """,
                 (user_id,)
             ).fetchall()
-
-            return [
-                Claim(
-                    id=r["id"],
-                    user_id=r["user_id"],
-                    persona_id=r["persona_id"],
-                    project_id=r["project_id"],
-                    claim_type=ClaimType(r["claim_type"]),
-                    text=r["text"],
-                    tools=json.loads(r["tools"]),
-                    metric_values=json.loads(r["metric_values"]),
-                    source_line=r["source_line"],
-                    source_page=r["source_page"],
-                    raw_sentence=r["raw_sentence"],
-                    status=ClaimStatus(r["status"]),
-                    created_at=datetime.fromisoformat(r["created_at"])
-                )
-                for r in rows
-            ]
+            return [self._hydrate_claim(r, conn) for r in rows]

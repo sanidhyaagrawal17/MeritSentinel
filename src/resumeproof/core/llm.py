@@ -11,6 +11,17 @@ from resumeproof.core.telemetry import telemetry, CallMetrics
 
 logger = logging.getLogger("resumeproof.llm")
 
+def _clean_json_str(raw: str) -> str:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+    return cleaned
+
 class LLMClient(ABC):
     """Abstract LLM Client interface."""
 
@@ -126,7 +137,7 @@ class OpenAICompatibleClient(LLMClient):
                             total_tokens=usage.get("total_tokens", 0),
                             latency_ms=latency,
                         ))
-                        return json.loads(content)
+                        return json.loads(_clean_json_str(content))
                     else:
                         logger.warning(
                             f"/v1/chat/completions json_schema returned status {resp.status_code}: {resp.text}. Falling back to native Ollama format parameter."
@@ -159,7 +170,7 @@ class OpenAICompatibleClient(LLMClient):
                 total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
                 latency_ms=latency,
             ))
-            return json.loads(content)
+            return json.loads(_clean_json_str(content))
 
 class FakeLLMClient(LLMClient):
     """Offline, deterministic LLM client for tests and CI with recorded fixtures."""

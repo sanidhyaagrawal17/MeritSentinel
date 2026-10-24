@@ -129,3 +129,75 @@ def test_reject_claim_audit(review_session, claim_store):
     audit = claim_store.get_audit_trail(claim.id)
     assert audit.action_taken == ClaimStatus.REJECTED
     assert audit.extractor_text == "Built Paxos consensus engine with Istio service mesh."
+
+def test_unconfirmed_profile_fact_tokens_blocked():
+    fact = ProfileFact(
+        id=str(uuid.uuid4()),
+        user_id="user_unconfirmed",
+        fact_type=ProfileFactType.CGPA,
+        value="3.8 / 4",
+        is_confirmed=False
+    )
+    # Unconfirmed facts must NEVER provide allowed tokens
+    assert fact.allowed_tokens() == set()
+
+    # Once confirmed during onboarding, tokens are released (including single-digit denominators like '4')
+    fact.is_confirmed = True
+    tokens = fact.allowed_tokens()
+    assert "3.8" in tokens
+    assert "4" in tokens
+
+def test_update_claim_review_direct_store(claim_store):
+    user_id = "user_direct_review"
+    claim_id = str(uuid.uuid4())
+    claim = Claim(
+        id=claim_id,
+        user_id=user_id,
+        claim_type=ClaimType.PROJECT_METRIC,
+        text="Extracted text with inflated metric 100k",
+        tools=["Go"],
+        metric_values=["100k"],
+        status=ClaimStatus.EXTRACTED
+    )
+    claim_store.save_claim(claim)
+
+    # Use store method directly to edit claim
+    claim_store.update_claim_review(
+        claim_id=claim_id,
+        action=ClaimStatus.EDITED,
+        user_correction_text="Corrected text 45k",
+        user_correction_tools=["Go", "Raft"],
+        user_correction_metrics=["45k"],
+        notes="Corrected benchmark"
+    )
+
+    claims = claim_store.get_claims(user_id)
+    assert len(claims) == 1
+    assert claims[0].text == "Corrected text 45k"
+    assert claims[0].tools == ["Go", "Raft"]
+    assert claims[0].metric_values == ["45k"]
+    assert claims[0].effective_text() == "Corrected text 45k"
+    assert claims[0].audit is not None
+    assert claims[0].audit.extractor_text == "Extracted text with inflated metric 100k"
+
+    # Now simulate passing mastery threshold and verify get_eligible_claims
+    from resumeproof.schemas.mastery import AnswerRecord, MasteryState
+    ans = AnswerRecord(id="ans_ok", claim_id=claim_id, raw_score=4)
+    mastery = MasteryState(
+        claim_id=claim_id,
+        aggregate_score=3.5,
+        effective_score=2.8,
+        confidence=0.6,
+        n_effective=3.0,
+        total_answers=2,
+        is_eligible=True
+    )
+    claim_store.save_answer_and_mastery(ans, mastery)
+
+    eligible = claim_store.get_eligible_claims(user_id)
+    assert len(eligible) == 1
+    assert eligible[0].text == "Corrected text 45k"
+    assert eligible[0].effective_text() == "Corrected text 45k"
+    assert eligible[0].audit is not None
+    assert eligible[0].audit.extractor_metrics == ["100k"]
+    assert eligible[0].audit.user_correction_metrics == ["45k"]

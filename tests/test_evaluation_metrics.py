@@ -45,6 +45,12 @@ def test_input_validation():
     with pytest.raises(ValueError, match="Rater sequences must have identical lengths"):
         quadratic_weighted_kappa([1, 2], [1])
 
+    with pytest.raises(ValueError, match="Ratings must be between"):
+        quadratic_weighted_kappa([5, 2], [1, 2])
+
+    with pytest.raises(ValueError, match="Ratings must be between"):
+        quadratic_weighted_kappa([-1, 2], [1, 2])
+
     with pytest.raises(ValueError):
         exact_agreement_rate([1], [1, 2])
 
