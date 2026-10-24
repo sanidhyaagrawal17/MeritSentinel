@@ -74,3 +74,29 @@ def test_cli_interview_auto_answer(tmp_path, monkeypatch):
     assert "Grade:" in result.output
     assert "INTERVIEW TRANSCRIPT SUMMARY" in result.output
     assert "Total Turns Completed: 3" in result.output
+
+def test_cli_interview_interactive_mode(tmp_path, monkeypatch):
+    test_db = tmp_path / "cli_interactive_interview.db"
+    monkeypatch.setenv("RESUMEPROOF_DB_PATH", str(test_db))
+
+    runner = CliRunner()
+    user_inputs = [
+        "In Task-Tracker API, SQLite was configured with WAL mode and SQLAlchemy connection pool of 10 connections.",
+        "We implemented recursive UDP DNS resolution in Python sockets with struct parsing.",
+    ]
+    stdin_data = "\n".join(user_inputs) + "\n"
+
+    result = runner.invoke(cli, [
+        "interview",
+        "--persona", "sam_okafor",
+        "--budget", "2",
+        "--interactive",
+        "--fake-llm",
+    ], input=stdin_data)
+
+    assert result.exit_code == 0
+    assert "Execution Mode: [INTERACTIVE CANDIDATE SESSION]" in result.output
+    assert "Your Answer:" in result.output
+    assert "INTERVIEW TRANSCRIPT SUMMARY [INTERACTIVE CANDIDATE SESSION]" in result.output
+    assert "Total Turns Completed: 2" in result.output
+

@@ -123,3 +123,66 @@ def test_background_grader_async_execution_and_drain():
     assert isinstance(drained, dict)
 
     bg.shutdown(wait=True)
+
+def test_confident_wrong_topic_answer_scores_zero_against_rubric():
+    """Verifies that a confident, well-written answer about the wrong topic scores 0 or 1 against the asked rubric.
+
+    Scenario:
+    Question asks about Task-Tracker API JWT authentication and role-based access control.
+    Candidate responds with a confident, technically detailed answer about Raft consensus and Byzantine fault tolerance.
+    The grader MUST evaluate strictly against the supplied JWT rubric:
+    - Raw score must be 0 or 1 (specifically 0 for off-topic/unsubstantiated claims).
+    - Matched rubric IDs must be empty.
+    - The JWT rubric item ID must be listed in missed_rubric_ids.
+    - Feedback must cite that the answer addresses an unrelated topic.
+    """
+    client = FakeLLMClient()
+    grader = AnswerGrader(llm_client=client, model="qwen2.5:7b")
+
+    claim = Claim(
+        id="c_jwt",
+        user_id="u_sam",
+        persona_id="sam_okafor",
+        project_id="task-tracker-api",
+        text="Implemented JWT authentication and role-based access control.",
+    )
+    rubric = RubricItem(
+        id="rubric_jwt_42",
+        project_id="task-tracker-api",
+        topic="jwt_authentication",
+        source_file="README.md",
+        source_line=8,
+        source_quote="Implemented JWT authentication and role-based access control.",
+        criteria={
+            0: "Irrelevant, refuses to answer, or makes claims that contradict verified facts.",
+            1: "Generic explanation of auth tokens without implementation mechanics.",
+            2: "Mentions JWT payload signing but omits role-based access control.",
+            3: "Accurately articulates JWT token generation, expiration, and RBAC middleware.",
+            4: "Expert mastery explaining token revocation, HMAC-SHA256 vs RS256 trade-offs, and RBAC scopes.",
+        }
+    )
+
+    question_text = "How did you implement JWT authentication and verify user roles in Task-Tracker API?"
+    # A confident, well-written technical answer about the completely wrong topic (Raft consensus)
+    confident_wrong_topic_answer = (
+        "We implemented a distributed Raft consensus cluster with Python asyncio sockets, "
+        "electing leaders via randomized election timeouts and replicating log entries across "
+        "5 quorum nodes with Byzantine fault tolerance."
+    )
+
+    grade = grader.grade_answer(
+        claim=claim,
+        question_text=question_text,
+        answer_text=confident_wrong_topic_answer,
+        rubric=rubric,
+    )
+
+    # Invariant assertions
+    assert grade.raw_score in (0, 1), f"Expected score 0 or 1 for off-topic answer, got {grade.raw_score}"
+    assert grade.raw_score == 0
+    assert rubric.id in grade.missed_rubric_ids, f"Expected {rubric.id} in missed_rubric_ids, got {grade.missed_rubric_ids}"
+    assert rubric.id not in grade.matched_rubric_ids
+    assert len(grade.matched_rubric_ids) == 0
+    assert len(grade.evidence_quote) > 0
+    assert len(grade.feedback) > 0
+

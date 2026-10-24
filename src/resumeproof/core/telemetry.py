@@ -17,6 +17,7 @@ class CallMetrics:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     status: str = "success"
     error: Optional[str] = None
+    digest: Optional[str] = None
 
 class TelemetryCollector:
     def __init__(self):
@@ -24,8 +25,9 @@ class TelemetryCollector:
 
     def log_call(self, metric: CallMetrics) -> None:
         self.records.append(metric)
+        digest_str = f" digest={metric.digest}" if metric.digest else ""
         logger.info(
-            f"LLM Call: model={metric.model} path={metric.structured_path_used} "
+            f"LLM Call: model={metric.model}{digest_str} path={metric.structured_path_used} "
             f"tokens={metric.total_tokens} latency={metric.latency_ms:.2f}ms status={metric.status}"
         )
 
@@ -37,7 +39,8 @@ class TelemetryCollector:
             "total_tokens": total_tokens,
             "total_latency_ms": total_latency,
             "avg_latency_ms": total_latency / max(1, len(self.records)),
-            "paths_used": list(set(r.structured_path_used for r in self.records))
+            "paths_used": list(set(r.structured_path_used for r in self.records)),
+            "model_digests": {r.model: r.digest for r in self.records if r.digest},
         }
 
 telemetry = TelemetryCollector()

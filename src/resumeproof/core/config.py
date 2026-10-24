@@ -33,7 +33,7 @@ class Settings(BaseModel):
         description="Prior score used for Bayesian shrinkage (0-4 scale)"
     )
     prior_weight: float = Field(
-        default=2.0,
+        default=1.5,
         description="Prior weight for confidence denominator: n_eff / (n_eff + prior_weight)"
     )
 

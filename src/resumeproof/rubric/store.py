@@ -68,31 +68,44 @@ class RubricStore:
             return [self._hydrate(r) for r in rows]
 
     def find_best_rubric_for_claim(self, claim: Claim, persona_id: Optional[str] = None) -> Optional[RubricItem]:
-        """Finds the most relevant grounded rubric item for a given claim based on project and text overlap."""
+        """Finds the most relevant grounded rubric item for a given claim based on project and text overlap.
+
+        Strict Isolation Invariant:
+        1. If claim has a project_id, ONLY search rubrics belonging to that project. NEVER leak another project's rubrics!
+        2. If claim has no project_id, search persona rubrics ONLY if keyword overlap > 0.
+        3. Never match against answer text; matching is strictly grounded in the question's source claim.
+        """
+        import re
+
         rubrics = []
         if claim.project_id:
             rubrics = self.get_rubrics_for_project(claim.project_id)
-        if not rubrics and persona_id:
+        elif persona_id:
             rubrics = self.get_rubrics_for_persona(persona_id)
 
         if not rubrics:
             return None
 
-        # Score rubrics by keyword overlap with claim text, tools, and metrics
-        claim_terms = set(claim.text.lower().split())
+        STOPWORDS = {"and", "with", "for", "the", "a", "an", "in", "on", "at", "to", "of", "by", "from", "as", "is", "using", "built", "implemented", "sustained"}
+        claim_terms = {t for t in re.findall(r"[a-zA-Z0-9]+", claim.text.lower()) if t not in STOPWORDS}
         for tool in claim.tools:
-            claim_terms.add(tool.lower())
+            claim_terms.update(t for t in re.findall(r"[a-zA-Z0-9]+", tool.lower()) if t not in STOPWORDS)
         for metric in claim.metric_values:
-            claim_terms.add(metric.lower())
+            claim_terms.update(t for t in re.findall(r"[a-zA-Z0-9]+", metric.lower()) if t not in STOPWORDS)
 
-        best_rubric = rubrics[0]
-        max_overlap = -1
+        best_rubric = None
+        max_overlap = 0
 
         for r in rubrics:
-            quote_terms = set(r.source_quote.lower().split())
+            quote_terms = {t for t in re.findall(r"[a-zA-Z0-9]+", r.source_quote.lower()) if t not in STOPWORDS}
             overlap = len(claim_terms.intersection(quote_terms))
             if overlap > max_overlap:
                 max_overlap = overlap
                 best_rubric = r
+
+        # If claim belongs to a project, but no specific sentence overlap was found,
+        # fallback to the primary overview rubric of that SAME project.
+        if best_rubric is None and claim.project_id and rubrics:
+            return rubrics[0]
 
         return best_rubric

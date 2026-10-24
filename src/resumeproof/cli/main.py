@@ -127,13 +127,18 @@ def extract_cmd(resume: str, user: str, persona: str | None, model: str | None, 
 @click.option("--persona", "-p", required=True, help="Demo Persona ID (sam_okafor, alex_rivera, priya_nair)")
 @click.option("--user", "-u", default="default_user", help="User ID")
 @click.option("--budget", "-b", default=5, type=int, help="Question budget")
-@click.option("--auto-answer", is_flag=True, default=False, help="Automatically answer using persona sample answers")
+@click.option("--auto-answer", is_flag=True, default=False, help="Automatically answer using persona sample answers (scripted test run)")
+@click.option("--interactive", "-i", is_flag=True, default=False, help="Interactive mode where user types answers at CLI prompt")
 @click.option("--async-grade", is_flag=True, default=False, help="Grade in background asynchronously without blocking per turn")
 @click.option("--fake-llm", is_flag=True, default=False, help="Use offline FakeLLMClient")
-def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, async_grade: bool, fake_llm: bool):
+def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, interactive: bool, async_grade: bool, fake_llm: bool):
     """Run an adaptive mock interview session for a persona with 3B generator and 7B grader."""
+    is_scripted = auto_answer and not interactive
+    mode_label = "[SCRIPTED TEST RUN]" if is_scripted else "[INTERACTIVE CANDIDATE SESSION]"
+
     click.echo(f"\n============================================================")
     click.echo(f"  RESUMEPROOF ADAPTIVE INTERVIEW SESSION: {persona}")
+    click.echo(f"  Execution Mode: {mode_label}")
     click.echo(f"============================================================")
 
     db = Database(settings.db_path)
@@ -224,7 +229,7 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, async
             )
             click.echo(f"Interviewer (3B): {question.question_text}")
 
-            if auto_answer:
+            if is_scripted:
                 ans_key = sample_cycle[(turn_idx - 1) % len(sample_cycle)]
                 answer_text = None
                 # Check for project-specific sample answer
@@ -242,7 +247,7 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, async
                 if not answer_text:
                     answer_text = sample_answers.get(ans_key, "I implemented this using verified project architecture.")
 
-                click.secho(f"Candidate (Auto: {ans_key}): {answer_text}", fg="white")
+                click.secho(f"Candidate: {answer_text}", fg="white")
             else:
                 answer_text = click.prompt("Your Answer", type=str)
 
@@ -263,6 +268,10 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, async
                 )
                 click.echo(f"Evidence Quote: \"{turn.grade.evidence_quote}\"")
                 click.echo(f"Rubric Anchor:  \"{turn.grade.rubric_reference}\"")
+                if turn.grade.matched_rubric_ids:
+                    click.echo(f"Matched Rubrics: {', '.join(turn.grade.matched_rubric_ids)}")
+                if turn.grade.missed_rubric_ids:
+                    click.echo(f"Missed Rubrics:  {', '.join(turn.grade.missed_rubric_ids)}")
                 click.echo(f"Critique:       {turn.grade.feedback}")
 
             # Check updated mastery state for the claim
@@ -279,7 +288,7 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, async
 
         finalized = engine.finalize_session(session.id)
         click.echo("=" * 65)
-        click.secho("INTERVIEW TRANSCRIPT SUMMARY", bold=True)
+        click.secho(f"INTERVIEW TRANSCRIPT SUMMARY {mode_label}", bold=True)
         click.echo(f"Session ID: {finalized.id}")
         click.echo(f"Total Turns Completed: {finalized.total_questions}")
         click.echo(f"Status: {finalized.status}")

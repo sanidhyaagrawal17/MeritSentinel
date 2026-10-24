@@ -84,6 +84,7 @@ class QuestionGenerator:
             id=str(uuid.uuid4()),
             claim_id=claim.id,
             project_id=claim.project_id or (rubric.project_id if rubric else None),
+            rubric_id=rubric.id if rubric else None,
             priority=priority,
             question_text=clean_q,
             is_followup=is_followup,

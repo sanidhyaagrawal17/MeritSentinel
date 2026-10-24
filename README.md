@@ -96,17 +96,20 @@ python scripts/run_manual_benchmark.py --model qwen2.5:7b --output results/bench
 
 ## Mastery Calibration & Threshold Sensitivity
 
-> **Note on Calibration Data**: The calibration counts below use scripted simulated scores across Day 0, Day 3, and Day 7 to analyze mathematical boundary sensitivity under half-life decay. These will be re-measured with real grader output once the human-labeled validation set is completed.
+> **[SCRIPTED TEST RUN] Calibration Data**: The calibration counts below use deterministic scripted benchmark inputs across Day 0, Day 3, and Day 7 to analyze mathematical boundary sensitivity under half-life decay ($T_{half} = 30$ days). All scripted runs are labeled as `[SCRIPTED TEST RUN]` to differentiate them from real interactive interviews.
 
 ### Configuration Sensitivity Analysis (Realistic Day Gaps: 0, 3, 7 days)
 
-Under exponential half-life decay ($T_{half} = 30$ days), an answer given on Day 0 has weight $0.5^{3/30} = 0.933$ on Day 3. Consequently, two answers on Day 3 yield $n_{eff} = 1.933 < 2.0$.
+Under exponential half-life decay ($T_{half} = 30$ days), an answer given on Day 0 has weight $0.5^{3/30} = 0.93303$ on Day 3. Consequently, two answers spaced 3 days apart yield $n_{eff} = 1.93303$.
 
-| Configuration | Parameters | Day 0 (1 ans) | Day 3 (2 ans) | Day 7 (3 ans) | Behavior / Tradeoff |
+| Configuration | Parameters | Day 0 (1 ans) | Day 3 (2 ans) | Day 7 (3 ans) | Behavior / Mathematical Evaluation |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Config 1 (Current)** | $\text{conf} \ge 0.50$, $k = 2.0$ | 0 / 7 | 0 / 7 | 5 / 7 | Rigid boundary: $n_{eff} = 1.933 \implies \text{conf} = 0.4915 < 0.50$. Requires 3 answers before any claim is eligible. |
-| **Config 2** | $\text{conf} \ge 0.45$, $k = 2.0$ | 0 / 7 | 5 / 7 | 5 / 7 | Tolerates realistic inter-turn decay ($\text{conf} = 0.4915 \ge 0.45$). Admits supported claims on 2nd answer; traps remain blocked. |
-| **Config 3** | $\text{conf} \ge 0.50$, $k = 1.5$ | 0 / 7 | 5 / 7 | 5 / 7 | Faster Bayesian confidence acquisition ($\text{conf} = 1.933 / (1.933 + 1.5) = 0.5630 \ge 0.50$). Admits supported claims on 2nd answer; traps remain blocked. |
+| **Config 1 (Previous)** | $\text{conf} \ge 0.50$, $k = 2.0$ | 0 / 7 | 0 / 7 | 5 / 7 | Overly rigid: $n_{eff} = 1.933 \implies \text{conf} = 0.4915 < 0.50$. Requires 3 answers before any claim is eligible. |
+| **Config 2 (Flawed)** | $\text{conf} \ge 0.45$, $k = 2.0$ | 0 / 7 | 5 / 7* (0 / 7) | 5 / 7 | **Mathematical Flaw**: While $\text{conf} = 0.4915 \ge 0.45$, for a competent candidate scoring raw 3.0, Bayesian shrinkage gives $\text{effective\_score} = 2.0 + (3.0 - 2.0) \times 0.4915 = 2.4915 < 2.50$, failing the threshold! The 5/7 figure only held if candidate scored 4.0 on every answer. For competent 3.0 answers, Config 2 admits 0 / 7 on Day 3. |
+| **Config 3 (Adopted Default)** | $\text{conf} \ge 0.50$, $k = 1.5$ | 0 / 7 | 5 / 7 | 5 / 7 | **Optimal & Defensible**: Faster Bayesian confidence acquisition ($\text{conf} = 1.93303 / (1.93303 + 1.5) = 0.56307 \ge 0.50$). For competent answers (raw 3.0), $\text{effective\_score} = 2.0 + 1.0 \times 0.56307 = 2.56307 \ge 2.50$. Admits supported claims on 2nd answer 3 days apart; unsupported traps remain strictly blocked. |
+
+\* *Config 2 5/7 figure required unachievable perfect 4/4 answers; under realistic 3/4 competent answers, Config 2 yielded 0/7.*
 
 Tolerance: All threshold checks implement a small numerical tolerance ($10^{-4}$) to prevent floating-point boundary artifacts.
+
 

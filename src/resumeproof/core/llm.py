@@ -56,6 +56,32 @@ class OpenAICompatibleClient(LLMClient):
         self.v1_endpoint = f"{self.base_url}/v1/chat/completions"
         self.ollama_endpoint = f"{self.base_url}/api/chat"
         self._tested_json_schema_support: Optional[bool] = None
+        self._model_digests: dict[str, str] = {}
+        self._load_model_digests()
+
+    def _load_model_digests(self) -> None:
+        try:
+            with httpx.Client(timeout=3.0) as client:
+                resp = client.get(f"{self.base_url}/api/tags")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for m in data.get("models", []):
+                        name = m.get("name", "")
+                        digest = m.get("digest")
+                        if name and digest:
+                            self._model_digests[name] = digest
+                            if name.endswith(":latest"):
+                                self._model_digests[name[:-7]] = digest
+                            if ":" in name:
+                                self._model_digests.setdefault(name.split(":")[0], digest)
+        except Exception as e:
+            logger.debug(f"Could not load Ollama model digests: {e}")
+
+    def get_model_digest(self, model: str) -> Optional[str]:
+        if model in self._model_digests:
+            return self._model_digests[model]
+        self._load_model_digests()
+        return self._model_digests.get(model)
 
     def chat_completion(
         self,
@@ -84,6 +110,7 @@ class OpenAICompatibleClient(LLMClient):
                 completion_tokens=usage.get("completion_tokens", 0),
                 total_tokens=usage.get("total_tokens", 0),
                 latency_ms=latency,
+                digest=self.get_model_digest(model),
             ))
             return data["choices"][0]["message"]["content"]
 
@@ -136,6 +163,7 @@ class OpenAICompatibleClient(LLMClient):
                             completion_tokens=usage.get("completion_tokens", 0),
                             total_tokens=usage.get("total_tokens", 0),
                             latency_ms=latency,
+                            digest=self.get_model_digest(model),
                         ))
                         return json.loads(_clean_json_str(content))
                     else:
@@ -169,6 +197,7 @@ class OpenAICompatibleClient(LLMClient):
                 completion_tokens=data.get("eval_count", 0),
                 total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
                 latency_ms=latency,
+                digest=self.get_model_digest(model),
             ))
             return json.loads(_clean_json_str(content))
 
@@ -248,43 +277,62 @@ class FakeLLMClient(LLMClient):
 
         # GradeStructuredPayload handling
         if "grade" in schema_name.lower():
-            msg_lower = msg_str.lower()
-            # Check for trap answers (unsupported claims)
-            if any(t in msg_lower for t in ["byzantine", "raft cluster", "bgp scrubbing", "kafka event bus", "paxos engine", "70b lora", "16-gpu"]):
+            import re
+            user_msg = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), msg_str)
+            ans_snippet = user_msg.split("Candidate Answer:")[-1].strip().lower() if "Candidate Answer:" in user_msg else user_msg.lower()
+            rubric_ids = re.findall(r"\[Rubric Item ID:\s*([a-zA-Z0-9\-_]+)\]", user_msg)
+
+            # Check for trap answers (unsupported claims) or off-topic answers in candidate answer
+            if any(t in ans_snippet for t in ["byzantine", "raft cluster", "raft consensus", "bgp scrubbing", "kafka event bus", "paxos engine", "70b lora", "16-gpu"]) or "wrong topic" in ans_snippet:
+                ev_quote = (
+                    "We used an Apache Kafka event bus and BGP scrubbing centers to stream financial transactions"
+                    if ("kafka" in ans_snippet or "bgp" in ans_snippet)
+                    else "We implemented a distributed Raft consensus cluster"
+                )
                 return {
                     "raw_score": 0,
-                    "evidence_quote": "We used an Apache Kafka event bus and BGP scrubbing centers to stream financial transactions",
+                    "evidence_quote": ev_quote,
                     "rubric_reference": "Verified documentation explicitly disclaims Kafka, Raft consensus, and BGP scrubbing.",
-                    "feedback": "Answer claims unverified enterprise distributed systems technologies not present in the verified project."
+                    "feedback": "Answer discusses an unrelated topic or claims unverified enterprise distributed systems technologies not present in the verified project.",
+                    "matched_rubric_ids": [],
+                    "missed_rubric_ids": rubric_ids,
                 }
-            elif any(g in msg_lower for g in ["standard tutorials", "general tutorials", "error handling and responded quickly", "apis require good database"]):
+            elif any(g in ans_snippet for g in ["standard tutorials", "general tutorials", "error handling and responded quickly", "apis require good database"]):
                 return {
                     "raw_score": 1,
                     "evidence_quote": "We followed standard tutorials to make sure the app responded quickly.",
                     "rubric_reference": "Verified documentation specifies SQLite WAL mode and connection pooling benchmarks.",
-                    "feedback": "Generic response lacking concrete technical parameters or architectural depth."
+                    "feedback": "Generic response lacking concrete technical parameters or architectural depth.",
+                    "matched_rubric_ids": [],
+                    "missed_rubric_ids": rubric_ids,
                 }
-            elif any(t in msg_lower for t in ["terse", "sqlalchemy connection pool of 10"]):
-                if "locust" not in msg_lower and "checkpointing" not in msg_lower:
+            elif any(t in ans_snippet for t in ["terse", "sqlalchemy connection pool of 10"]):
+                if "locust" not in ans_snippet and "checkpointing" not in ans_snippet:
                     return {
                         "raw_score": 2,
                         "evidence_quote": "Enabled WAL mode and SQLAlchemy connection pool of 10 to hit 350 req/sec.",
                         "rubric_reference": "README.md: Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.",
-                        "feedback": "Accurate parameters provided but lacks architectural depth on concurrency trade-offs."
+                        "feedback": "Accurate parameters provided but lacks architectural depth on concurrency trade-offs.",
+                        "matched_rubric_ids": rubric_ids[:1],
+                        "missed_rubric_ids": rubric_ids[1:],
                     }
-            elif any(s in msg_lower for s in ["locust test", "checkpointing", "write-ahead logging", "single-node", "350 read req/sec"]):
+            elif any(s in ans_snippet for s in ["locust test", "checkpointing", "write-ahead logging", "single-node", "350 read req/sec"]):
                 return {
                     "raw_score": 4,
                     "evidence_quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
                     "rubric_reference": "README.md: Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.",
-                    "feedback": "Exemplary architectural understanding articulating WAL checkpointing, single-writer multi-reader trade-offs, and verified locust benchmark numbers."
+                    "feedback": "Exemplary architectural understanding articulating WAL checkpointing, single-writer multi-reader trade-offs, and verified locust benchmark numbers.",
+                    "matched_rubric_ids": rubric_ids,
+                    "missed_rubric_ids": [],
                 }
             # Default competent rating
             return {
                 "raw_score": 3,
                 "evidence_quote": "Candidate answered with accurate technical specifics.",
                 "rubric_reference": "Project verified documentation.",
-                "feedback": "Competent technical response matching ground truth."
+                "feedback": "Competent technical response matching ground truth.",
+                "matched_rubric_ids": rubric_ids,
+                "missed_rubric_ids": [],
             }
 
         # Automatic detection of demo personas in resume text

@@ -103,8 +103,8 @@ def test_half_life_time_decay():
     )
     # Weight should have decayed by 50% (from 1.0 to 0.5)
     assert abs(state.n_effective - 0.5) < 0.01
-    # Confidence: 0.5 / (0.5 + 2) = 0.2
-    assert abs(state.confidence - 0.2) < 0.01
+    # Confidence under Config 3 (k=1.5): 0.5 / (0.5 + 1.5) = 0.25
+    assert abs(state.confidence - 0.25) < 0.01
 
 def test_batch_replay_matches_sequential_execution():
     claim_id = "claim_replay"

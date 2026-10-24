@@ -141,10 +141,18 @@ class InterviewEngine:
                 id=question.claim_id,
                 user_id=session.user_id,
                 persona_id=session.persona_id,
+                project_id=question.project_id,
                 text="Claim under review",
             )
+        elif question.project_id and not claim_obj.project_id:
+            claim_obj.project_id = question.project_id
 
-        rubric = self.rubric_store.find_best_rubric_for_claim(claim_obj, persona_id=session.persona_id)
+        # Grader receives only the rubric items attached to the claim the question was generated from
+        rubric = None
+        if getattr(question, "rubric_id", None):
+            rubric = self.rubric_store.get_rubric_by_id(question.rubric_id)
+        if not rubric:
+            rubric = self.rubric_store.find_best_rubric_for_claim(claim_obj, persona_id=session.persona_id)
 
         def _on_grade_complete(grade: GradeResult) -> None:
             self.session_store.update_turn_grade_and_mastery(

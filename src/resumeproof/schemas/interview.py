@@ -15,6 +15,7 @@ class InterviewQuestion(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     claim_id: str
     project_id: Optional[str] = None
+    rubric_id: Optional[str] = None
     priority: QuestionPriority
     question_text: str
     is_followup: bool = False
@@ -32,6 +33,8 @@ class GradeResult(BaseModel):
     evidence_quote: str = Field(description="Exact quote from candidate answer supporting the evaluation")
     rubric_reference: str = Field(description="Exact quote or citation from the project rubric")
     feedback: str = Field(description="Detailed technical assessment of strengths and omissions")
+    matched_rubric_ids: list[str] = Field(default_factory=list, description="List of rubric item IDs satisfied by answer")
+    missed_rubric_ids: list[str] = Field(default_factory=list, description="List of rubric item IDs missed or violated")
     cached: bool = False
     latency_ms: float = 0.0
 
