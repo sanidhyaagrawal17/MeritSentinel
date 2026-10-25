@@ -28,16 +28,34 @@ def cli():
     pass
 
 @cli.command("extract")
-@click.option("--resume", "-r", required=True, type=click.Path(exists=True), help="Path to resume PDF or Markdown file")
+@click.option("--resume", "-r", default=None, type=click.Path(), help="Path to resume PDF or Markdown file")
+@click.option("--data-dir", "-d", default=None, type=click.Path(), help="Directory containing user resume and project folders (git-ignored)")
 @click.option("--user", "-u", default="default_user", help="User ID")
 @click.option("--persona", "-p", default=None, help="Demo Persona ID (alex_rivera, priya_nair, sam_okafor)")
 @click.option("--model", "-m", default=None, help="Model name for extraction (default: settings.extractor_model / qwen2.5:3b)")
 @click.option("--auto-confirm", is_flag=True, default=False, help="Automatically confirm all extracted claims without prompt")
 @click.option("--fake-llm", is_flag=True, default=False, help="Use offline FakeLLMClient")
-def extract_cmd(resume: str, user: str, persona: str | None, model: str | None, auto_confirm: bool, fake_llm: bool):
+def extract_cmd(resume: str | None, data_dir: str | None, user: str, persona: str | None, model: str | None, auto_confirm: bool, fake_llm: bool):
     """Extract and review claims and profile facts from a resume."""
-    click.echo(f"==> Parsing resume: {resume}")
-    parsed = parse_resume(resume)
+    if not resume and not data_dir:
+        raise click.UsageError("Must specify either --resume or --data-dir.")
+
+    if resume:
+        resume_path = Path(resume)
+    elif data_dir:
+        d = Path(data_dir)
+        if (d / "resume.pdf").exists():
+            resume_path = d / "resume.pdf"
+        elif (d / "resume.md").exists():
+            resume_path = d / "resume.md"
+        else:
+            raise click.UsageError(f"No resume.pdf or resume.md found in data-dir: {data_dir}")
+
+    if not persona and data_dir:
+        persona = Path(data_dir).name
+
+    click.echo(f"==> Parsing resume: {resume_path}")
+    parsed = parse_resume(resume_path)
     click.echo(f"==> Extracted {len(parsed.lines)} lines using {parsed.extractor_used}")
 
     if fake_llm or settings.use_fake_llm:
@@ -60,6 +78,9 @@ def extract_cmd(resume: str, user: str, persona: str | None, model: str | None, 
     try:
         store = ClaimStore(db)
         session = ReviewSession(store)
+
+        # Clear previous claims and facts for this user/persona to prevent duplicate accumulation
+        store.clear_claims(user_id=user, persona_id=persona)
 
         if auto_confirm:
             click.echo("==> Auto-confirming all facts and claims...")
@@ -124,20 +145,25 @@ def extract_cmd(resume: str, user: str, persona: str | None, model: str | None, 
         db.close()
 
 @cli.command("interview")
-@click.option("--persona", "-p", required=True, help="Demo Persona ID (sam_okafor, alex_rivera, priya_nair)")
+@click.option("--persona", "-p", default=None, help="Demo Persona ID (sam_okafor, alex_rivera, priya_nair)")
+@click.option("--data-dir", "-d", default=None, type=click.Path(), help="Directory containing user resume and project folders (git-ignored)")
 @click.option("--user", "-u", default="default_user", help="User ID")
 @click.option("--budget", "-b", default=5, type=int, help="Question budget")
 @click.option("--auto-answer", is_flag=True, default=False, help="Automatically answer using persona sample answers (scripted test run)")
 @click.option("--interactive", "-i", is_flag=True, default=False, help="Interactive mode where user types answers at CLI prompt")
 @click.option("--async-grade", is_flag=True, default=False, help="Grade in background asynchronously without blocking per turn")
 @click.option("--fake-llm", is_flag=True, default=False, help="Use offline FakeLLMClient")
-def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, interactive: bool, async_grade: bool, fake_llm: bool):
+def interview_cmd(persona: str | None, data_dir: str | None, user: str, budget: int, auto_answer: bool, interactive: bool, async_grade: bool, fake_llm: bool):
     """Run an adaptive mock interview session for a persona with 3B generator and 7B grader."""
+    if not persona and not data_dir:
+        raise click.UsageError("Must specify either --persona or --data-dir.")
+
+    effective_persona = persona or Path(data_dir).name
     is_scripted = auto_answer and not interactive
-    mode_label = "[SCRIPTED TEST RUN]" if is_scripted else "[INTERACTIVE CANDIDATE SESSION]"
+    mode_label = "[SCRIPTED ANSWERS]" if is_scripted else "[INTERACTIVE CANDIDATE SESSION]"
 
     click.echo(f"\n============================================================")
-    click.echo(f"  RESUMEPROOF ADAPTIVE INTERVIEW SESSION: {persona}")
+    click.echo(f"  RESUMEPROOF ADAPTIVE INTERVIEW SESSION: {effective_persona}")
     click.echo(f"  Execution Mode: {mode_label}")
     click.echo(f"============================================================")
 
@@ -147,31 +173,47 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, inter
         rubric_store = RubricStore(db)
         session_store = SessionStore(db, claim_store)
 
-        # Step 1: Ensure rubrics are built and saved for this persona
-        click.echo(f"==> Loading project rubrics for persona: {persona}...")
-        rubrics = build_rubrics_for_persona(persona)
+        # Step 1: Ensure rubrics are built and saved for this persona or data-dir
+        click.echo(f"==> Loading project rubrics for: {effective_persona}...")
+        if data_dir:
+            from resumeproof.rubric.builder import build_rubrics_for_project
+            rubrics = []
+            proj_dir = Path(data_dir) / "projects"
+            if proj_dir.is_dir():
+                for p in sorted(proj_dir.iterdir()):
+                    if p.is_dir():
+                        rubrics.extend(build_rubrics_for_project(p, persona_id=effective_persona))
+            else:
+                rubrics.extend(build_rubrics_for_project(Path(data_dir), persona_id=effective_persona))
+        else:
+            rubrics = build_rubrics_for_persona(effective_persona)
+
         rubric_store.save_rubrics(rubrics)
         click.echo(f"==> Registered {len(rubrics)} grounded rubric items in SQLite.")
 
         # Step 2: Ensure claims exist for persona in claim store
-        claims = claim_store.get_claims(user_id=user, persona_id=persona)
+        claims = claim_store.get_claims(user_id=user, persona_id=effective_persona)
         if not claims:
-            click.echo(f"==> No claims found in store for {persona}. Auto-extracting from resume...")
-            resume_path = Path("data/demo") / persona / "resume.pdf"
-            if not resume_path.exists():
-                resume_path = Path("data/demo") / persona / "resume.md"
+            click.echo(f"==> No claims found in store for {effective_persona}. Auto-extracting from resume...")
+            if data_dir:
+                d = Path(data_dir)
+                resume_path = d / "resume.pdf" if (d / "resume.pdf").exists() else d / "resume.md"
+            else:
+                resume_path = Path("data/demo") / effective_persona / "resume.pdf"
+                if not resume_path.exists():
+                    resume_path = Path("data/demo") / effective_persona / "resume.md"
             parsed = parse_resume(resume_path)
             temp_client = FakeLLMClient() if (fake_llm or settings.use_fake_llm) else OpenAICompatibleClient(base_url=settings.ollama_base_url)
             facts, raw_claims = extract_from_resume(
                 parse_result=parsed,
                 llm_client=temp_client,
-                persona_id=persona,
+                persona_id=effective_persona,
                 user_id=user,
                 model=settings.extractor_model
             )
             rev_session = ReviewSession(claim_store)
             rev_session.run_batch_review(facts, raw_claims, auto_confirm_all=True)
-            claims = claim_store.get_claims(user_id=user, persona_id=persona)
+            claims = claim_store.get_claims(user_id=user, persona_id=effective_persona)
             click.echo(f"==> Initialized and confirmed {len(claims)} claims into pool.")
 
         # Step 3: Setup LLM Clients
@@ -199,16 +241,19 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, inter
 
         # Load sample answers if in auto_answer mode
         sample_answers = {}
-        sample_path = Path("data/demo") / persona / "sample_answers.json"
+        if data_dir:
+            sample_path = Path(data_dir) / "sample_answers.json"
+        else:
+            sample_path = Path("data/demo") / effective_persona / "sample_answers.json"
         if sample_path.exists():
             import json
             sample_answers = json.loads(sample_path.read_text(encoding="utf-8"))
 
-        session = engine.start_session(persona_id=persona, user_id=user, budget=budget)
+        session = engine.start_session(persona_id=effective_persona, user_id=user, budget=budget)
         click.echo(f"==> Interview session created [ID: {session.id[:8]}...], budget: {budget} questions.\n")
 
         turn_idx = 1
-        sample_cycle = ["strong", "terse", "strong", "generic", "confidently_wrong"]
+        sample_cycle = ["strong", "strong", "strong", "terse", "confidently_wrong"]
         wait_for_grade = not async_grade
 
         while True:
@@ -227,7 +272,27 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, inter
                 fg="cyan",
                 bold=True
             )
-            click.echo(f"Interviewer (3B): {question.question_text}")
+
+            # Retrieve claim and rubric from store to display per-turn details
+            claim_obj = claim_store.get_claim(question.claim_id)
+            claim_text = claim_obj.text if claim_obj else "Claim under review"
+
+            rubric_obj = None
+            if getattr(question, "rubric_id", None):
+                rubric_obj = rubric_store.get_rubric_by_id(question.rubric_id)
+            if not rubric_obj and claim_obj:
+                rubric_obj = rubric_store.find_best_rubric_for_claim(claim_obj, persona_id=session.persona_id)
+
+            click.echo(f"Claim ID:          {question.claim_id}")
+            click.echo(f"Claim Text:        {claim_text}")
+            if rubric_obj:
+                click.echo(f"Rubric Item ID:    {rubric_obj.id}")
+                click.echo(f"Rubric Quote:      \"{rubric_obj.source_quote}\" ({rubric_obj.source_file}:{rubric_obj.source_line})")
+            else:
+                click.echo(f"Rubric Item ID:    None")
+                click.echo(f"Rubric Quote:      None")
+
+            click.echo(f"Interviewer (3B):  {question.question_text}")
 
             if is_scripted:
                 ans_key = sample_cycle[(turn_idx - 1) % len(sample_cycle)]
@@ -247,7 +312,7 @@ def interview_cmd(persona: str, user: str, budget: int, auto_answer: bool, inter
                 if not answer_text:
                     answer_text = sample_answers.get(ans_key, "I implemented this using verified project architecture.")
 
-                click.secho(f"Candidate: {answer_text}", fg="white")
+                click.secho(f"Candidate [SCRIPTED ANSWERS]: {answer_text}", fg="white")
             else:
                 answer_text = click.prompt("Your Answer", type=str)
 

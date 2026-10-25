@@ -23,12 +23,12 @@ Evaluate the candidate's answer strictly against the supplied verified project r
 
 CRITICAL EVALUATION RULES:
 1. ONLY evaluate against the supplied rubric items. You may ONLY credit or penalize the candidate against the explicitly supplied rubric items.
-2. The critique and feedback may NOT demand architectural details, parameters, benchmarks, or requirements outside of the supplied rubric items.
+2. SCORE ANCHORS INVARIANT: Each rubric item defines explicit scoring anchors for levels 0 through 4 derived from its verified source text. You may ONLY cite these anchors. You are strictly forbidden from demanding architectural details, parameters, benchmarks, or requirements beyond what is explicitly stated in the supplied rubric anchors.
 3. You MUST output which rubric item IDs were matched and missed:
    - `matched_rubric_ids`: list of rubric item IDs where the candidate provided accurate technical evidence satisfying the criteria (scores 3 or 4).
    - `missed_rubric_ids`: list of rubric item IDs where the candidate failed to satisfy, omitted, or violated the required ground-truth criteria (scores 0, 1, or 2).
    - An item ID must appear in either matched_rubric_ids or missed_rubric_ids, never in both simultaneously.
-4. For every rubric item ID in `missed_rubric_ids`, the critique MUST cite the rubric item and explain specifically what was missing according to that rubric item's explicit criteria.
+4. For every rubric item ID in `missed_rubric_ids`, the critique MUST cite the rubric item anchor and explain specifically what was missing according to that rubric item's explicit criteria.
 5. Off-Topic Disqualification: If the candidate's answer is about an unrelated or wrong topic (e.g. answering about DNS, Raft, or Kafka when asked about Task-Tracker API, connection pooling, or JWT), you MUST assign a score of 0 (or at most 1 if purely generic boilerplate), list the question's rubric item IDs in `missed_rubric_ids`, and explicitly state in the feedback that the answer discusses an unrelated topic.
 6. Output valid JSON matching the specified schema.
 """

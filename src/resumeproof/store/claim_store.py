@@ -265,6 +265,30 @@ class ClaimStore:
             rows = conn.execute(query, params).fetchall()
             return [self._hydrate_claim(r, conn) for r in rows]
 
+    def clear_claims(self, user_id: str, persona_id: Optional[str] = None) -> None:
+        """Clears claims, audits, and mastery states for a given user and persona."""
+        with self.db.transaction() as conn:
+            params: list = [user_id]
+            persona_filter = ""
+            if persona_id:
+                persona_filter = " AND persona_id = ?"
+                params.append(persona_id)
+
+            claim_ids = [
+                r[0] for r in conn.execute(
+                    f"SELECT id FROM claims WHERE user_id = ?{persona_filter}",
+                    params
+                ).fetchall()
+            ]
+
+            for cid in claim_ids:
+                conn.execute("DELETE FROM claim_audits WHERE claim_id = ?", (cid,))
+                conn.execute("DELETE FROM mastery_states WHERE claim_id = ?", (cid,))
+                conn.execute("DELETE FROM answer_records WHERE claim_id = ?", (cid,))
+
+            conn.execute(f"DELETE FROM claims WHERE user_id = ?{persona_filter}", params)
+            conn.execute(f"DELETE FROM profile_facts WHERE user_id = ?{persona_filter}", params)
+
     def get_audit_trail(self, claim_id: str) -> Optional[ClaimAudit]:
         with self.db.transaction() as conn:
             r = conn.execute("SELECT * FROM claim_audits WHERE claim_id = ?", (claim_id,)).fetchone()

@@ -13,3 +13,5 @@ build/
 *.db
 *.sqlite3
 results/benchmark_local_*.json
+data/local/
+local_data/

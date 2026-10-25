@@ -38,4 +38,5 @@ testpaths = ["tests"]
 addopts = "-v --cov=resumeproof --cov-report=term-missing"
 markers = [
     "parsing_pipeline: tests validating schema and pipeline mechanics via FakeLLMClient",
+    "real_model: tests running against live local Ollama LLMs",
 ]

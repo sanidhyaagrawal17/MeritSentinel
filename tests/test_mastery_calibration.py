@@ -189,8 +189,14 @@ def test_realistic_day_gaps_and_config_comparison():
                 if s3.is_eligible:
                     el_day7 += 1
 
+            supported_count = sum(
+                1 for c in claims
+                if not any(k in c.text.lower() for k in ["paxos", "70b", "byzantine", "ddos", "microservices", "100,000", "10 tb"])
+            )
+
             results[cfg_name][persona] = {
                 "total": len(claims),
+                "supported": supported_count,
                 "day0": el_day0,
                 "day3": el_day3,
                 "day7": el_day7,
@@ -205,20 +211,21 @@ def test_realistic_day_gaps_and_config_comparison():
     # Specific behavior verification:
     # Under Config 1 (conf>=0.5, k=2.0), a 3-day gap pushes n_eff to ~1.933 < 2.0, so confidence < 0.50 (Day 3 yields 0)
     for p in personas:
+        sup_cnt = results["Config 1 (k=2.0, conf>=0.5)"][p]["supported"]
         assert results["Config 1 (k=2.0, conf>=0.5)"][p]["day3"] == 0
-        assert results["Config 1 (k=2.0, conf>=0.5)"][p]["day7"] == 5
+        assert results["Config 1 (k=2.0, conf>=0.5)"][p]["day7"] == sup_cnt
 
     # Under Config 2 (conf >= 0.45, k=2.0), 2 answers with 3-day gap yield confidence ~0.4915 >= 0.45.
-    # Note: If scores are 4.0, effective_score = 2.0 + 2.0 * 0.4915 = 2.983 >= 2.5 (5 claims qualify).
-    # But if scores are 3.0, effective_score = 2.4915 < 2.50 (0 claims qualify).
     for p in personas:
-        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day3"] == 5
-        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day7"] == 5
+        sup_cnt = results["Config 2 (conf>=0.45, k=2.0)"][p]["supported"]
+        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day3"] == sup_cnt
+        assert results["Config 2 (conf>=0.45, k=2.0)"][p]["day7"] == sup_cnt
 
     # Under Config 3 (adopted default: conf>=0.5, k=1.5), 2 answers with 3-day gap yield confidence ~0.5630 >= 0.50.
     for p in personas:
-        assert results["Config 3 (adopted default: conf>=0.5, k=1.5)"][p]["day3"] == 5
-        assert results["Config 3 (adopted default: conf>=0.5, k=1.5)"][p]["day7"] == 5
+        sup_cnt = results["Config 3 (adopted default: conf>=0.5, k=1.5)"][p]["supported"]
+        assert results["Config 3 (adopted default: conf>=0.5, k=1.5)"][p]["day3"] == sup_cnt
+        assert results["Config 3 (adopted default: conf>=0.5, k=1.5)"][p]["day7"] == sup_cnt
 
 def test_answers_three_days_apart():
     """Explicitly verifies Config 3 vs Config 2 on answers 3 days apart for competent candidate (raw score 3.0).

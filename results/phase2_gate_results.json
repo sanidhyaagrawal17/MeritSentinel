@@ -1,0 +1,260 @@
+{
+  "item2_rubric_questions": {
+    "passed": 10,
+    "total": 10,
+    "details": [
+      {
+        "idx": 1,
+        "project_id": "mini-dns-resolver",
+        "topic": "mini_dns_resolver_a_recursive_dns",
+        "source_quote": "A recursive DNS query resolver built with Python raw sockets.",
+        "question": "How did you handle DNS query timeouts in your recursive DNS resolver built with Python raw sockets? What mechanisms did you implement to ensure reliable query responses?",
+        "overlap_tokens": [
+          "dns",
+          "python",
+          "query",
+          "raw",
+          "recursive",
+          "resolver"
+        ],
+        "passed": true,
+        "latency_ms": 3826.8029000028037
+      },
+      {
+        "idx": 2,
+        "project_id": "mini-dns-resolver",
+        "topic": "resolves_cached_dns",
+        "source_quote": "- Resolves cached DNS queries in under 45ms.",
+        "question": "How did you optimize the mini-dns-resolver to ensure that cached DNS queries are resolved within 45 milliseconds, and what specific mechanisms did you implement to achieve this performance?",
+        "overlap_tokens": [
+          "cached",
+          "dns",
+          "queries"
+        ],
+        "passed": true,
+        "latency_ms": 3469.241899991175
+      },
+      {
+        "idx": 3,
+        "project_id": "mini-dns-resolver",
+        "topic": "parses_a_and",
+        "source_quote": "- Parses A and CNAME records per RFC 1035.",
+        "question": "How did you ensure your implementation correctly handles edge cases such as DNS loops when parsing A and CNAME records according to RFC 1035?",
+        "overlap_tokens": [
+          "cname",
+          "records",
+          "rfc"
+        ],
+        "passed": true,
+        "latency_ms": 3555.5430999957025
+      },
+      {
+        "idx": 4,
+        "project_id": "mini-dns-resolver",
+        "topic": "local_toy_project",
+        "source_quote": "- Local toy project; no BGP scrubbing or enterprise DDoS protection.",
+        "question": "How did you ensure the local toy project adhered to the constraints of no BGP scrubbing or enterprise DDoS protection, and what specific technical measures did you implement to manage these limitations?",
+        "overlap_tokens": [
+          "bgp",
+          "ddos",
+          "enterprise",
+          "local",
+          "project",
+          "scrubbing",
+          "toy"
+        ],
+        "passed": true,
+        "latency_ms": 3560.799999977462
+      },
+      {
+        "idx": 5,
+        "project_id": "mini-dns-resolver",
+        "topic": "overview_uses_python_struct",
+        "source_quote": "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
+        "question": "How did you handle the scenario where the UDP payload size exceeded the in-memory dict cache capacity, and what mechanism did you implement to ensure TTL expiration for cache entries?",
+        "overlap_tokens": [
+          "cache",
+          "dict",
+          "in-memory",
+          "ttl",
+          "udp"
+        ],
+        "passed": true,
+        "latency_ms": 3726.2539000075776
+      },
+      {
+        "idx": 6,
+        "project_id": "packet-sniffer",
+        "topic": "packet_sniffer_python_packet_capture",
+        "source_quote": "Python packet capture tool using AF_INET raw sockets.",
+        "question": "How did you handle packet filtering in your Python packet capture tool to ensure it only captured traffic using AF_INET raw sockets?",
+        "overlap_tokens": [
+          "af_inet",
+          "capture",
+          "packet",
+          "python",
+          "raw",
+          "tool"
+        ],
+        "passed": true,
+        "latency_ms": 3481.7481999925803
+      },
+      {
+        "idx": 7,
+        "project_id": "packet-sniffer",
+        "topic": "verified_features_unpacks_20_byte",
+        "source_quote": "- Unpacks 20-byte IPv4 headers and extracts protocol (TCP/UDP/ICMP).",
+        "question": "How did you handle the unpacking of the 20-byte IPv4 header to distinguish between TCP, UDP, and ICMP protocols in your implementation? What mechanisms did you use to ensure accurate protocol detection?",
+        "overlap_tokens": [
+          "20-byte",
+          "icmp",
+          "ipv4",
+          "protocol",
+          "tcp",
+          "udp"
+        ],
+        "passed": true,
+        "latency_ms": 3982.672799989814
+      },
+      {
+        "idx": 8,
+        "project_id": "packet-sniffer",
+        "topic": "verified_features_educational_script_no",
+        "source_quote": "- Educational script; no Kafka or Raft consensus.",
+        "question": "How did you ensure the educational script adhered strictly to the absence of Kafka and Raft consensus mechanisms, and what specific design decisions did you make to implement this constraint?",
+        "overlap_tokens": [
+          "educational",
+          "kafka",
+          "raft",
+          "script"
+        ],
+        "passed": true,
+        "latency_ms": 3766.061999980593
+      },
+      {
+        "idx": 9,
+        "project_id": "packet-sniffer",
+        "topic": "overview_extracts_ip_version",
+        "source_quote": "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.",
+        "question": "How did you determine the bit positions for extracting the IP version, IHL, TTL, and source/dest IPs using bit shift operations, and what constraints did you consider in your implementation?",
+        "overlap_tokens": [
+          "bit",
+          "dest",
+          "ihl",
+          "ips",
+          "shift",
+          "source",
+          "ttl",
+          "version"
+        ],
+        "passed": true,
+        "latency_ms": 3947.7307999914046
+      },
+      {
+        "idx": 10,
+        "project_id": "task-tracker-api",
+        "topic": "task_tracker_api_fastapi_task_management",
+        "source_quote": "FastAPI task management backend using SQLite.",
+        "question": "How did you ensure database transactions in your FastAPI task management backend used SQLite were atomic, consistent, isolated, and durable (ACID properties)?",
+        "overlap_tokens": [
+          "backend",
+          "fastapi",
+          "management",
+          "task"
+        ],
+        "passed": true,
+        "latency_ms": 3685.214299999643
+      }
+    ]
+  },
+  "item3_grader_cases": {
+    "(a) Confident wrong topic": {
+      "score": 0,
+      "evidence_quote": "We built an Apache Kafka event bus and BGP scrubbing centers to stream financial transactions into our Byzantine fault-tolerant Raft cluster with zero downtime.",
+      "matched_rubrics": [],
+      "missed_rubrics": [
+        "rubric_wal_anchor"
+      ],
+      "critique": "The candidate's answer discusses an unrelated topic, focusing on Kafka, Raft, and BGP, which are not relevant to the Task-Tracker API project as described in the rubric. The answer does not mention SQLite, WAL mode, or connection pooling, which are the key elements required by the rubric.",
+      "latency_ms": 24450.88330001454
+    },
+    "(b) Correct but terse": {
+      "score": 3,
+      "evidence_quote": "Enabled WAL mode and SQLAlchemy connection pool of 10 to hit 350 req/sec.",
+      "matched_rubrics": [
+        "rubric_wal_anchor"
+      ],
+      "missed_rubrics": [],
+      "critique": "The candidate's answer is competent and matches the verified ground truth. However, it does not provide the exact number of connections in the connection pool, which is a key parameter mentioned in the rubric. The answer is accurate but could be more precise.",
+      "latency_ms": 12122.265399986645
+    },
+    "(c) Copy-pasted generic": {
+      "score": 1,
+      "evidence_quote": "APIs require good database connections and error handling. We followed standard tutorials to make sure the app responded quickly.",
+      "matched_rubrics": [],
+      "missed_rubrics": [
+        "rubric_wal_anchor"
+      ],
+      "critique": "The candidate's answer is generic and does not provide concrete details matching the verified ground truth. The answer does not mention SQLite WAL mode or connection pooling, which are critical components for sustaining 350 concurrent read req/sec as per the project rubric.",
+      "latency_ms": 13741.418200021144
+    },
+    "(d) Strong answer": {
+      "score": 3,
+      "evidence_quote": "In Task-Tracker API, SQLite can become a write bottleneck, so we enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
+      "matched_rubrics": [
+        "rubric_wal_anchor"
+      ],
+      "missed_rubrics": [],
+      "critique": "The candidate's answer is competent and matches the verified ground truth. The answer correctly mentions enabling WAL mode and tuning connection pooling, which are key aspects of the project. However, the answer does not explicitly state the sustained read rate of 350 req/sec, which is a critical detail. The candidate should have directly stated the read rate to fully satisfy the criteria.",
+      "latency_ms": 17848.932799999602
+    }
+  },
+  "item4_task_tracker_anchors": {
+    "score": 3,
+    "evidence_quote": "In Task-Tracker API, SQLite can become a write bottleneck, so we enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
+    "matched_rubrics": [
+      "rubric_wal_anchor"
+    ],
+    "missed_rubrics": [],
+    "critique": "The candidate's answer is competent and matches the verified ground truth. The answer correctly mentions enabling WAL mode and tuning connection pooling, which are key aspects of the project. However, the answer does not explicitly state the sustained read rate of 350 req/sec, which is a critical detail. The candidate should have directly stated the read rate to fully satisfy the criteria.",
+    "latency_ms": 17848.932799999602
+  },
+  "item5_extractor_eval": {
+    "sam_okafor": {
+      "total_facts": 8,
+      "has_employer": false,
+      "has_emp_dates": false,
+      "total_claims": 21,
+      "skill_claims_count": 12,
+      "project_claims_count": 5,
+      "misclassified_count": 0,
+      "key_claims_matched": "6/6",
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "alex_rivera": {
+      "total_facts": 10,
+      "has_employer": true,
+      "has_emp_dates": true,
+      "total_claims": 22,
+      "skill_claims_count": 13,
+      "project_claims_count": 9,
+      "misclassified_count": 0,
+      "key_claims_matched": "6/6",
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "priya_nair": {
+      "total_facts": 10,
+      "has_employer": true,
+      "has_emp_dates": true,
+      "total_claims": 20,
+      "skill_claims_count": 12,
+      "project_claims_count": 7,
+      "misclassified_count": 0,
+      "key_claims_matched": "6/6",
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  }
+}

@@ -10,7 +10,11 @@ from resumeproof.interview.caching import GradingCache
 from resumeproof.interview.background import BackgroundGrader
 
 def test_grader_zero_tier_label_invariant():
-    """CRITICAL INVARIANT: The grader must never see any answer-quality tier labels."""
+    """CRITICAL INVARIANT: The grader must never see any answer-quality tier labels.
+
+    NOTE: This test uses FakeLLMClient to test plumbing and prompt construction mechanics,
+    NOT grader quality or real LLM scoring accuracy.
+    """
     client = FakeLLMClient()
     grader = AnswerGrader(llm_client=client, model="qwen2.5:7b")
 
@@ -53,7 +57,11 @@ def test_grader_zero_tier_label_invariant():
     assert len(grade.feedback) > 0
 
 def test_grader_scores_trap_answer_zero():
-    """Verifies that an unsupported trap answer receives raw_score = 0."""
+    """Verifies that an unsupported trap answer receives raw_score = 0.
+
+    NOTE: This test uses FakeLLMClient to test plumbing and pipeline mechanics,
+    NOT grader quality or real LLM scoring accuracy.
+    """
     client = FakeLLMClient()
     grader = AnswerGrader(llm_client=client, model="qwen2.5:7b")
 
@@ -70,7 +78,11 @@ def test_grader_scores_trap_answer_zero():
     assert "Kafka" in grade.evidence_quote or "financial" in grade.evidence_quote
 
 def test_grading_cache_hit_avoids_recomputation():
-    """Verifies that duplicate answers are returned from cache with cached=True."""
+    """Verifies that duplicate answers are returned from cache with cached=True.
+
+    NOTE: This test uses FakeLLMClient to test plumbing and cache mechanics,
+    NOT grader quality.
+    """
     db = Database(":memory:")
     cache = GradingCache(db)
     client = FakeLLMClient()
@@ -93,7 +105,11 @@ def test_grading_cache_hit_avoids_recomputation():
     assert res2.latency_ms == 0.0
 
 def test_background_grader_async_execution_and_drain():
-    """Verifies background grading runs asynchronously on thread pool and drains cleanly."""
+    """Verifies background grading runs asynchronously on thread pool and drains cleanly.
+
+    NOTE: This test uses FakeLLMClient to test plumbing and background worker mechanics,
+    NOT grader quality.
+    """
     db = Database(":memory:")
     cache = GradingCache(db)
     client = FakeLLMClient()
@@ -135,6 +151,9 @@ def test_confident_wrong_topic_answer_scores_zero_against_rubric():
     - Matched rubric IDs must be empty.
     - The JWT rubric item ID must be listed in missed_rubric_ids.
     - Feedback must cite that the answer addresses an unrelated topic.
+
+    NOTE: This test uses FakeLLMClient to test pipeline wiring and schema validation,
+    NOT grader quality or real LLM scoring accuracy.
     """
     client = FakeLLMClient()
     grader = AnswerGrader(llm_client=client, model="qwen2.5:7b")

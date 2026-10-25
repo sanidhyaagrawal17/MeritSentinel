@@ -99,8 +99,35 @@ class QuestionPlanner:
         chosen_priority: QuestionPriority = QuestionPriority.UNTESTED
 
         if untested:
-            # Sort untested claims so we rotate through projects/claims evenly
-            chosen_claim = untested[0]
+            # Sort untested claims so we rotate through projects/claims evenly:
+            projects_seen = []
+            claims_by_project: dict[Optional[str], list[Claim]] = {}
+            for c in untested:
+                pid = c.project_id
+                if pid not in claims_by_project:
+                    projects_seen.append(pid)
+                    claims_by_project[pid] = []
+                claims_by_project[pid].append(c)
+
+            # Prioritize project claims (pid is not None) over standalone skill claims (pid is None)
+            proj_keys = [p for p in projects_seen if p is not None] + [p for p in projects_seen if p is None]
+
+            # Rotate project order so we do not repeatedly ask the same project if multiple projects exist
+            if self.last_claim_id and self.last_claim_id in self.claims and len(proj_keys) > 1:
+                last_pid = self.claims[self.last_claim_id].project_id
+                if last_pid in proj_keys:
+                    idx = proj_keys.index(last_pid)
+                    proj_keys = proj_keys[idx + 1:] + proj_keys[:idx + 1]
+
+            # Interleave across distinct projects: round 0 takes 1st claim of each project, etc.
+            rotated_untested: list[Claim] = []
+            max_len = max(len(claims_by_project[p]) for p in proj_keys)
+            for i in range(max_len):
+                for p in proj_keys:
+                    if i < len(claims_by_project[p]):
+                        rotated_untested.append(claims_by_project[p][i])
+
+            chosen_claim = rotated_untested[0]
             chosen_priority = QuestionPriority.UNTESTED
         elif weak:
             # Prefer claims asked fewer times in this session
