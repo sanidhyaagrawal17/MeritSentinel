@@ -48,7 +48,7 @@ STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="ResumeProof", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR), autoescape=True)
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.autoescape = True
 app.state.tailoring_cache = {}
 
