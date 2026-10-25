@@ -124,12 +124,31 @@ def normalize_claim_type(raw_type: str) -> ClaimType:
 
     return ClaimType.PROJECT_METRIC
 
+def detect_section_header(text: str) -> Optional[str]:
+    """Detects standard resume section headers across diverse resume formats."""
+    clean = text.lstrip("#*•-► ").strip().upper().rstrip(":")
+    if len(clean.split()) > 5 or len(clean) > 45:
+        return None
+    clean = re.sub(r"\s+\d{4}$", "", clean).strip()
+    if clean in ("EDUCATION", "ACADEMIC BACKGROUND", "ACADEMIC HISTORY"):
+        return "EDUCATION"
+    if clean in ("FEATURED PROJECTS", "PROJECTS", "KEY PROJECTS", "ACADEMIC PROJECTS", "PERSONAL PROJECTS", "PROJECT EXPERIENCE"):
+        return "PROJECTS"
+    if clean in ("TECHNICAL SKILLS", "SKILLS", "TECHNOLOGIES", "TECHNICAL PROFICIENCIES", "CORE SKILLS", "PROGRAMMING LANGUAGES", "SKILLS & EXPERTISE"):
+        return "SKILLS"
+    if clean in ("WORK EXPERIENCE", "EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE", "INTERNSHIP", "INTERNSHIPS"):
+        return "EXPERIENCE"
+    if clean in ("COURSEWORK & COMPETITIONS", "COMPETITIONS & COURSEWORK", "COMPETITIONS", "ACHIEVEMENTS", "HONORS & AWARDS", "AWARDS", "CERTIFICATIONS"):
+        return "ACHIEVEMENTS"
+    if clean in ("SUMMARY", "PROFESSIONAL SUMMARY", "PROFILE"):
+        return "SUMMARY"
+    return None
+
 def _split_skill_text(raw_text: str) -> list[str]:
     """Splits a skill text (e.g. 'Languages: Python, SQL' or 'FastAPI, SQLite, Sockets') into individual skill names."""
-    txt_heading = raw_text.lstrip("#").strip().upper().rstrip(":")
-    if txt_heading in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS", "NETWORKING & BACKEND", "DISTRIBUTED SYSTEMS", "ML & DATA"):
+    txt_heading = raw_text.lstrip("#*•-► ").strip().upper().rstrip(":")
+    if detect_section_header(txt_heading):
         return []
-
     if ":" in raw_text:
         raw_text = raw_text.split(":", 1)[1]
     raw_skills = re.split(r"[,;•|]+", raw_text)
@@ -139,6 +158,8 @@ def _split_skill_text(raw_text: str) -> list[str]:
         clean = re.sub(r"^[-*•#\s]+", "", clean).strip()
         clean = re.sub(r"^(and\s+)", "", clean, flags=re.IGNORECASE).strip()
         clean = clean.rstrip(".,;")
+        if detect_section_header(clean):
+            continue
         if clean.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS", "NETWORKING & BACKEND", "DISTRIBUTED SYSTEMS", "ML & DATA"):
             continue
         if clean and len(clean) >= 2 and not clean.lower().startswith("claim:"):
@@ -154,24 +175,33 @@ def _map_resume_lines(parse_result: ParseResult) -> tuple[dict[int, str], dict[i
     has_experience_section = False
 
     for line in parse_result.lines:
-        txt = line.text.strip()
-        txt_upper = txt.lstrip("#").strip().upper().rstrip(":")
-
-        if txt_upper in ("EDUCATION", "PROJECTS", "SKILLS", "TECHNICAL SKILLS", "EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"):
-            current_section = txt_upper
+        sec = detect_section_header(line.text)
+        if sec:
+            current_section = sec
             current_project = None
             line_sections[line.line_number] = current_section
-            if current_section in ("EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"):
+            if current_section == "EXPERIENCE":
                 has_experience_section = True
             continue
 
+        txt = line.text.strip()
         if current_section == "PROJECTS":
-            # Identify project name heading lines like "Task-Tracker API (Python, FastAPI, SQLite):"
-            if "(" in txt and (txt.endswith(":") or not txt.startswith("-")):
-                proj_name = txt.split("(")[0].strip()
-                current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
-            elif txt.endswith(":") and not txt.startswith("-"):
-                current_project = re.sub(r"[^a-zA-Z0-9]+", "-", txt[:-1].lower()).strip("-")
+            is_bullet = txt.startswith(("-", "*", "•", "►"))
+            ends_with_period = txt.endswith(".")
+
+            # Heading lines never end with a period, and are not bullet points
+            if not is_bullet and not ends_with_period:
+                if " - " in txt and (re.search(r"\b20\d\d\b", txt) or len(txt.split()) <= 12):
+                    proj_name = txt.split(" - ")[0].strip()
+                    current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
+                elif "(" in txt and (txt.endswith(":") or not txt.startswith("-")):
+                    proj_name = txt.split("(")[0].strip()
+                    current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
+                elif txt.endswith(":"):
+                    proj_name = txt.rstrip(":").strip()
+                    current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
+                elif len(txt.split()) <= 4 and not any(ch in txt for ch in [",", ";", "/"]):
+                    current_project = re.sub(r"[^a-zA-Z0-9]+", "-", txt.lower()).strip("-")
 
         line_sections[line.line_number] = current_section
         if current_project:
@@ -267,6 +297,10 @@ def extract_from_resume(
     claims: list[Claim] = []
 
     for item in raw_claims_list:
+        clean_item_text = item.text.strip()
+        if detect_section_header(clean_item_text):
+            continue
+
         ctype = normalize_claim_type(str(item.claim_type))
 
         # Check section context
@@ -292,15 +326,21 @@ def extract_from_resume(
                 best_overlap = overlap
                 best_line_num = line.line_number
 
-        if best_line_num is not None and best_overlap >= 3:
+        if best_line_num is not None and (best_overlap >= 3 or best_overlap == len(claim_words)):
             item.source_line = best_line_num
             if best_line_num in line_projects:
                 project_id = line_projects[best_line_num]
         elif item.source_line is not None and item.source_line in line_projects:
             project_id = line_projects[item.source_line]
 
-        # CRITICAL INVARIANT: experience or project claims must NEVER be typed as skill or tool
+        # Filter out standalone project titles or tech-stack lines falsely emitted as project_metric
         if in_project_or_exp_section or project_id:
+            # If item is just a project heading
+            if any(clean_item_text.lower() == p.lower() for p in line_projects.values()):
+                continue
+            # If item is a single tool name without bullet context
+            if ctype in (ClaimType.SKILL, ClaimType.TOOL) or (ctype == ClaimType.PROJECT_METRIC and len(clean_item_text.split()) <= 3 and not any(ch.isdigit() for ch in clean_item_text)):
+                continue
             if ctype in (ClaimType.SKILL, ClaimType.TOOL):
                 if item.metric_values or any(char.isdigit() for char in item.text):
                     ctype = ClaimType.PROJECT_METRIC
@@ -317,6 +357,8 @@ def extract_from_resume(
                 skills_list = [item.text.strip()]
 
             for skill_name in skills_list:
+                if detect_section_header(skill_name) or skill_name.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS"):
+                    continue
                 claim_id = str(uuid.uuid4())
                 audit = ClaimAudit(
                     extractor_text=skill_name,
@@ -366,13 +408,13 @@ def extract_from_resume(
 
     # Fallback: ensure all skills listed in resume Skills sections are parsed as individual skill claims
     for line in parse_result.lines:
-        txt_heading = line.text.lstrip("#").strip().upper().rstrip(":")
-        if txt_heading in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS", "NETWORKING & BACKEND", "DISTRIBUTED SYSTEMS", "ML & DATA"):
+        txt_heading = line.text.lstrip("#*•-► ").strip().upper().rstrip(":")
+        if detect_section_header(txt_heading) or txt_heading in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS", "NETWORKING & BACKEND", "DISTRIBUTED SYSTEMS", "ML & DATA"):
             continue
         if line_sections.get(line.line_number) in ("SKILLS", "TECHNICAL SKILLS"):
             split_skills = _split_skill_text(line.text)
             for skill_name in split_skills:
-                if skill_name.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS"):
+                if detect_section_header(skill_name) or skill_name.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS"):
                     continue
                 if not any(c.claim_type == ClaimType.SKILL and c.text.lower() == skill_name.lower() for c in claims):
                     cid = str(uuid.uuid4())
@@ -396,43 +438,134 @@ def extract_from_resume(
                         )
                     ))
 
-    # Bullet fallback: ensure all bullets in project/experience sections are captured
+    # Bullet fallback: ensure all bullets in project/experience/achievements sections are captured
     for line in parse_result.lines:
         sec = line_sections.get(line.line_number)
-        if sec in ("PROJECTS", "EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"):
-            txt = line.text.strip()
-            if txt.startswith(("-", "*", "•")) or txt.lower().startswith("claim:"):
-                clean_bullet = re.sub(r"^[-*•]\s*", "", txt).strip()
-                clean_bullet = re.sub(r"^claim:\s*", "", clean_bullet, flags=re.IGNORECASE).strip()
-                if len(clean_bullet) >= 10:
-                    bullet_words = set(re.findall(r"[a-zA-Z0-9]+", clean_bullet.lower()))
-                    already_captured = any(
-                        len(bullet_words.intersection(set(re.findall(r"[a-zA-Z0-9]+", c.text.lower())))) >= max(3, len(bullet_words) * 3 // 4)
-                        for c in claims
-                    )
-                    if not already_captured:
-                        proj_id = line_projects.get(line.line_number)
-                        ctype = ClaimType.PROJECT_METRIC if any(ch.isdigit() for ch in clean_bullet) else ClaimType.EXPERIENCE_CLAIM
-                        claims.append(Claim(
-                            id=str(uuid.uuid4()),
-                            user_id=user_id,
-                            persona_id=persona_id,
-                            project_id=proj_id,
-                            claim_type=ctype,
-                            text=clean_bullet,
-                            source_line=line.line_number,
-                            source_page=1,
-                            status=ClaimStatus.EXTRACTED,
-                            audit=ClaimAudit(
-                                extractor_text=clean_bullet,
-                                extractor_tools=[],
-                                extractor_metrics=[],
-                                action_taken=ClaimStatus.EXTRACTED
-                            )
-                        ))
+        txt = line.text.strip()
+        if detect_section_header(txt):
+            continue
+
+        if sec == "PROJECTS":
+            clean_txt = re.sub(r"^[-*•►]\s*", "", txt).strip()
+            clean_txt = re.sub(r"^claim:\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+            is_bullet = txt.startswith(("-", "*", "•", "►")) or txt.lower().startswith("claim:")
+            ends_with_period = clean_txt.endswith(".")
+            has_action_verb = any(clean_txt.lower().startswith(v) for v in [
+                "built", "implemented", "developed", "trained", "benchmarked", "exported", "architected", "designed", "engineered", "created", "deployed", "tracked", "captured", "parsed", "prevented"
+            ])
+
+            if not is_bullet and not ends_with_period and not has_action_verb:
+                continue
+            if not has_action_verb and not is_bullet and ("github.com" in txt or any(t in txt for t in ["Python,", "FastAPI,", "React,", "PyTorch,"])):
+                continue
+
+            if clean_txt and (has_action_verb or is_bullet or ends_with_period) and len(clean_txt) >= 15:
+                bullet_words = set(re.findall(r"[a-zA-Z0-9]+", clean_txt.lower()))
+                already_captured = any(
+                    len(bullet_words.intersection(set(re.findall(r"[a-zA-Z0-9]+", c.text.lower())))) >= max(3, len(bullet_words) * 3 // 4)
+                    for c in claims if c.claim_type != ClaimType.SKILL
+                )
+                if not already_captured:
+                    proj_id = line_projects.get(line.line_number)
+                    ctype = ClaimType.PROJECT_METRIC if any(ch.isdigit() for ch in clean_txt) else ClaimType.EXPERIENCE_CLAIM
+                    claims.append(Claim(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        persona_id=persona_id,
+                        project_id=proj_id,
+                        claim_type=ctype,
+                        text=clean_txt,
+                        tools=[],
+                        metric_values=[],
+                        source_line=line.line_number,
+                        source_page=1,
+                        status=ClaimStatus.EXTRACTED,
+                        audit=ClaimAudit(
+                            extractor_text=clean_txt,
+                            extractor_tools=[],
+                            extractor_metrics=[],
+                            action_taken=ClaimStatus.EXTRACTED
+                        )
+                    ))
+
+        elif sec in ("EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"):
+            clean_txt = re.sub(r"^[-*•►]\s*", "", txt).strip()
+            clean_txt = re.sub(r"^claim:\s*", "", clean_txt, flags=re.IGNORECASE).strip()
+            is_bullet = txt.startswith(("-", "*", "•", "►")) or txt.lower().startswith("claim:")
+            ends_with_period = clean_txt.endswith(".")
+            has_action_verb = any(clean_txt.lower().startswith(v) for v in [
+                "delivered", "taught", "authored", "led", "managed", "developed", "built", "designed"
+            ])
+            if (is_bullet or has_action_verb or ends_with_period) and len(clean_txt) >= 15:
+                bullet_words = set(re.findall(r"[a-zA-Z0-9]+", clean_txt.lower()))
+                already_captured = any(
+                    len(bullet_words.intersection(set(re.findall(r"[a-zA-Z0-9]+", c.text.lower())))) >= max(3, len(bullet_words) * 3 // 4)
+                    for c in claims if c.claim_type != ClaimType.SKILL
+                )
+                if not already_captured:
+                    ctype = ClaimType.PROJECT_METRIC if any(ch.isdigit() for ch in clean_txt) else ClaimType.EXPERIENCE_CLAIM
+                    claims.append(Claim(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        persona_id=persona_id,
+                        project_id=None,
+                        claim_type=ctype,
+                        text=clean_txt,
+                        tools=[],
+                        metric_values=[],
+                        source_line=line.line_number,
+                        source_page=1,
+                        status=ClaimStatus.EXTRACTED,
+                        audit=ClaimAudit(
+                            extractor_text=clean_txt,
+                            extractor_tools=[],
+                            extractor_metrics=[],
+                            action_taken=ClaimStatus.EXTRACTED
+                        )
+                    ))
+
+        elif sec in ("ACHIEVEMENTS", "COURSEWORK & COMPETITIONS", "COMPETITIONS"):
+            clean_txt = re.sub(r"^[-*•►]\s*", "", txt).strip()
+            if len(clean_txt) >= 10:
+                bullet_words = set(re.findall(r"[a-zA-Z0-9]+", clean_txt.lower()))
+                already_captured = any(
+                    len(bullet_words.intersection(set(re.findall(r"[a-zA-Z0-9]+", c.text.lower())))) >= max(3, len(bullet_words) * 3 // 4)
+                    for c in claims
+                )
+                if not already_captured:
+                    claims.append(Claim(
+                        id=str(uuid.uuid4()),
+                        user_id=user_id,
+                        persona_id=persona_id,
+                        project_id=None,
+                        claim_type=ClaimType.ACHIEVEMENT,
+                        text=clean_txt,
+                        tools=[],
+                        metric_values=[],
+                        source_line=line.line_number,
+                        source_page=1,
+                        status=ClaimStatus.EXTRACTED,
+                        audit=ClaimAudit(
+                            extractor_text=clean_txt,
+                            extractor_tools=[],
+                            extractor_metrics=[],
+                            action_taken=ClaimStatus.EXTRACTED
+                        )
+                    ))
+
+    # Final cleanup: filter out any claim whose text is a section header or project heading name
+    filtered_claims = []
+    for c in claims:
+        clean_text = c.text.strip()
+        if detect_section_header(clean_text):
+            continue
+        clean_lower = clean_text.lower()
+        if any(clean_lower == p.lower() for p in line_projects.values()):
+            continue
+        filtered_claims.append(c)
 
     # Apply strict deduplication (same source line or same tools + metrics, preserving individual skills)
-    deduped_claims = deduplicate_claims(claims)
+    deduped_claims = deduplicate_claims(filtered_claims)
 
     return facts, deduped_claims
 

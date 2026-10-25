@@ -57,6 +57,60 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()
 
+def unwrap_lines(lines: list[ExtractedLine]) -> list[ExtractedLine]:
+    """Joins visually wrapped lines into logical semantic sentences."""
+    def is_header_text(text: str) -> bool:
+        clean = text.lstrip("#*•-► ").strip().upper().rstrip(':')
+        if len(clean.split()) > 5 or len(clean) > 45:
+            return False
+        clean = re.sub(r"\s+\d{4}$", "", clean).strip()
+        for kw in ["EDUCATION", "PROJECT", "SKILL", "EXPERIENCE", "EMPLOYMENT", "COMPETITION", "COURSEWORK", "ACHIEVEMENT", "CERTIFICATION", "SUMMARY", "PUBLICATIONS"]:
+            if kw in clean:
+                return True
+        return False
+
+    def should_join(prev_str: str, curr_str: str) -> bool:
+        if not prev_str:
+            return False
+        prev_s = prev_str.strip()
+        curr_s = curr_str.strip()
+        if is_header_text(curr_s):
+            return False
+        if curr_s.startswith(("-", "*", "•", "►", "1.", "2.", "3.", "4.")):
+            return False
+        if prev_s.endswith((".", "!", "?", ":")):
+            return False
+        if curr_s[0].islower() or curr_s.startswith(("(", "[", "/", "&", "≤", "<", ">", "=")):
+            return True
+        if prev_s.endswith((",", ";", "-", "–", "—", "/", "\\", "tool-", "non-")):
+            return True
+        last_word = prev_s.split()[-1].lower() if prev_s.split() else ""
+        if last_word in ("and", "or", "with", "for", "in", "to", "per", "across", "that", "using", "of", "by", "via", "on"):
+            return True
+        return False
+
+    joined: list[ExtractedLine] = []
+    for l in lines:
+        if joined and should_join(joined[-1].text, l.text):
+            prev = joined[-1]
+            if prev.text.endswith("-"):
+                new_text = prev.text[:-1] + l.text.strip()
+            else:
+                new_text = prev.text + " " + l.text.strip()
+            joined[-1] = ExtractedLine(
+                line_number=prev.line_number,
+                page_number=prev.page_number,
+                text=new_text,
+                raw_text=prev.raw_text + "\n" + l.raw_text
+            )
+        else:
+            joined.append(l)
+
+    return [
+        ExtractedLine(line_number=i+1, page_number=l.page_number, text=l.text, raw_text=l.raw_text)
+        for i, l in enumerate(joined)
+    ]
+
 def parse_pdf_with_pdfplumber(pdf_path: Path) -> list[ExtractedLine]:
     import pdfplumber
 
@@ -77,7 +131,7 @@ def parse_pdf_with_pdfplumber(pdf_path: Path) -> list[ExtractedLine]:
                     ))
                     line_counter += 1
 
-    return lines
+    return unwrap_lines(lines)
 
 def parse_pdf_with_pypdf(pdf_path: Path) -> list[ExtractedLine]:
     from pypdf import PdfReader
@@ -99,7 +153,7 @@ def parse_pdf_with_pypdf(pdf_path: Path) -> list[ExtractedLine]:
                 ))
                 line_counter += 1
 
-    return lines
+    return unwrap_lines(lines)
 
 def parse_resume(file_path: str | Path, force_fallback: bool = False) -> ParseResult:
     """Parses a resume file (PDF or Markdown/Plaintext) with provenance and line numbers."""
