@@ -15,3 +15,4 @@ build/
 results/benchmark_local_*.json
 data/local/
 local_data/
+.data_uploads/

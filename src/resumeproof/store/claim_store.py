@@ -346,6 +346,28 @@ class ClaimStore:
                 )
             )
 
+    def save_mastery_state(self, mastery: MasteryState) -> None:
+        """Saves or updates a mastery state directly."""
+        with self.db.transaction() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO mastery_states (
+                    claim_id, aggregate_score, effective_score, confidence,
+                    n_effective, total_answers, is_eligible, last_updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    mastery.claim_id,
+                    mastery.aggregate_score,
+                    mastery.effective_score,
+                    mastery.confidence,
+                    mastery.n_effective,
+                    mastery.total_answers,
+                    1 if mastery.is_eligible else 0,
+                    mastery.last_updated.isoformat()
+                )
+            )
+
     def get_mastery_state(self, claim_id: str) -> Optional[MasteryState]:
         with self.db.transaction() as conn:
             r = conn.execute("SELECT * FROM mastery_states WHERE claim_id = ?", (claim_id,)).fetchone()

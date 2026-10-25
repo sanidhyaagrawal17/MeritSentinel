@@ -167,3 +167,153 @@ Email: alex@example.com
 
     assert resp.status_code == 303
     assert "/review/u_custom" in resp.headers["location"]
+
+
+def test_upload_path_traversal_filename(test_client: TestClient, tmp_path: Path):
+    """POST /upload sanitizes path traversal characters in filename and stays in upload_dir."""
+    content = b"# Traversal Test\n- Python skill"
+    # Test unix traversal and windows traversal
+    for bad_name in ["../../../../etc/passwd.md", "..\\..\\windows\\system32\\hosts.txt"]:
+        resp = test_client.post(
+            "/upload",
+            data={"user_id": "u_traversal"},
+            files={"file": (bad_name, content, "text/markdown")},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        # Ensure file was saved inside .data_uploads and did not traverse outside
+        upload_dir = Path(".data_uploads")
+        assert upload_dir.exists()
+        # Verify no file was created outside upload_dir
+        assert not Path("passwd.md").exists()
+        assert not Path("hosts.txt").exists()
+
+
+def test_upload_oversized_file_rejected_with_413(test_client: TestClient):
+    """POST /upload rejects files exceeding 5MB with HTTP 413."""
+    # 5.5MB dummy content
+    oversized_content = b"0" * (5 * 1024 * 1024 + 1024 * 512)
+    resp = test_client.post(
+        "/upload",
+        data={"user_id": "u_oversized"},
+        files={"file": ("large_resume.txt", oversized_content, "text/plain")},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 413
+    assert "exceeds maximum" in resp.json()["detail"].lower()
+
+
+def test_upload_unsupported_file_type_rejected_with_400(test_client: TestClient):
+    """POST /upload rejects disallowed extensions (e.g. .exe, .sh) with HTTP 400."""
+    resp = test_client.post(
+        "/upload",
+        data={"user_id": "u_bad_ext"},
+        files={"file": ("malicious.exe", b"binarycontent", "application/octet-stream")},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 400
+    assert "unsupported file type" in resp.json()["detail"].lower()
+
+
+def test_jinja_autoescape_configured():
+    """Verifies Jinja2 templates environment has autoescape enabled."""
+    from resumeproof.ui.app import templates
+    assert templates.env.autoescape is True
+
+
+def test_tailor_page_get(test_client: TestClient):
+    """GET /tailor/{user_id} renders tailoring page with sample JD and action button."""
+    resp = test_client.get("/tailor/u_test_view")
+    assert resp.status_code == 200
+    assert "Resume Tailoring & Strict Verifier" in resp.text
+    assert "Target Job Description" in resp.text
+    assert "Tailor &amp; Verify Resume" in resp.text or "Tailor & Verify Resume" in resp.text
+
+
+def test_tailor_post_and_export_flow(test_client: TestClient):
+    """POST /tailor/{user_id} runs tailoring, strict verifier, and enables MD and PDF download."""
+    from resumeproof.schemas.mastery import MasteryState
+
+    # 1. Load persona
+    test_client.post("/upload", data={"user_id": "u_tailor_user", "persona": "sam_okafor"})
+    claim_store = test_client.app.state.services["claim_store"]
+    claims = claim_store.get_claims(user_id="u_tailor_user")
+    assert len(claims) > 0
+
+    # 2. Confirm claims and record high mastery
+    for c in claims:
+        claim_store.update_claim_review(claim_id=c.id, action=ClaimStatus.CONFIRMED)
+        claim_store.save_mastery_state(MasteryState(
+            claim_id=c.id,
+            aggregate_score=3.5,
+            effective_score=3.5,
+            confidence=0.85,
+            total_answers=2,
+            is_eligible=True,
+        ))
+
+    # 3. Post JD matching backend systems
+    jd_sample = """Looking for a Backend Engineer:
+- RESTful API development with FastAPI and database connection pooling
+- Low-latency socket networking and packet inspection
+- SQLite performance tuning and caching
+"""
+    tailor_resp = test_client.post(
+        "/tailor/u_tailor_user",
+        data={"jd_text": jd_sample},
+    )
+    assert tailor_resp.status_code == 200
+    assert "Matched &amp; Defensible" in tailor_resp.text or "Matched & Defensible" in tailor_resp.text
+    assert "Strict Deterministic Verifier: PASSED" in tailor_resp.text
+    assert "Download ATS PDF" in tailor_resp.text
+
+    # 4. Download Markdown
+    md_resp = test_client.get("/tailor/u_tailor_user/download_md")
+    assert md_resp.status_code == 200
+    assert "text/markdown" in md_resp.headers["content-type"]
+    assert "attachment; filename=\"resume_u_tailor_user.md\"" in md_resp.headers["content-disposition"]
+    assert "# Sam Okafor" in md_resp.text or "# Candidate" in md_resp.text
+
+    # 5. Download ATS PDF
+    pdf_resp = test_client.get("/tailor/u_tailor_user/download_pdf")
+    assert pdf_resp.status_code == 200
+    assert "application/pdf" in pdf_resp.headers["content-type"]
+    assert pdf_resp.content.startswith(b"%PDF-")
+
+
+def test_tailor_pdf_export_blocked_when_unverified(test_client: TestClient):
+    """GET /tailor/{user_id}/download_pdf returns HTTP 400 when strict verification fails."""
+    from resumeproof.verifier.strict_verifier import VerificationReport, SentenceVerificationResult
+
+    # Set up blocked report in cache
+    test_client.app.state.tailoring_cache["u_blocked_user"] = {
+        "tailored_markdown": "# Blocked User\n- Unsupported hallucinated metric 999k req/sec",
+        "verifier_report": VerificationReport(
+            passed=False,
+            total_sentences=2,
+            verified_count=1,
+            blocked_count=1,
+            sentence_results=[
+                SentenceVerificationResult(
+                    sentence_idx=0,
+                    sentence_text="Unsupported hallucinated metric 999k req/sec",
+                    status="BLOCKED",
+                    blocking_reasons=["Ungrounded metric 999k req/sec"],
+                )
+            ],
+            blocking_summary=["Sentence 0: Ungrounded metric 999k req/sec"],
+        ),
+    }
+
+    resp_pdf = test_client.get("/tailor/u_blocked_user/download_pdf")
+    assert resp_pdf.status_code == 400
+    assert "Export blocked" in resp_pdf.json()["detail"]
+    assert "failed strict verification" in resp_pdf.json()["detail"]
+
+    # Invariant: download_md must also be strictly blocked (no force-export)
+    resp_md = test_client.get("/tailor/u_blocked_user/download_md")
+    assert resp_md.status_code == 400
+    assert "Export blocked" in resp_md.json()["detail"]
+    assert "failed strict verification" in resp_md.json()["detail"]
+
+

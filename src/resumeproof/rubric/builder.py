@@ -72,15 +72,18 @@ def _find_supporting_atomic_points(
             }
             if stmt_tokens.intersection(line_tokens) or len(dn_lines) == 1:
                 clean_text = re.sub(r"^[-*+]\s+", "", line_str)
-                supporting.append(AtomicPoint(
-                    id=str(uuid.uuid4()),
-                    text=clean_text,
-                    source_file=rel_path,
-                    source_line=idx,
-                    source_quote=line_str,
-                ))
+                # Split bundled multi-sentence notes so each point is one checkable fact
+                sub_sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean_text) if s.strip()]
+                for s in sub_sentences:
+                    supporting.append(AtomicPoint(
+                        id=str(uuid.uuid4()),
+                        text=s,
+                        source_file=rel_path,
+                        source_line=idx,
+                        source_quote=line_str,
+                    ))
 
-    # 2. Supporting metrics from metrics.json
+    # 2. Supporting metrics from metrics.json (split into individual checkable facts)
     metrics_file = project_dir / "metrics.json"
     if metrics_file.is_file():
         try:
@@ -92,28 +95,26 @@ def _find_supporting_atomic_points(
         if m_content:
             try:
                 m_data = json.loads(m_content)
-                matches_metric = False
                 for k, v in m_data.items():
                     k_str = str(k).lower()
                     v_str = str(v).lower()
-                    if any(t in k_str or t in v_str or (t.isdigit() and t in v_str) for t in stmt_tokens):
-                        matches_metric = True
-                        break
+                    is_rel = any(t in k_str or t in v_str or (t.isdigit() and t in v_str) for t in stmt_tokens)
                     for num in re.findall(r"\d+(?:\.\d+)?", statement):
                         if num in str(v) or num in k_str:
-                            matches_metric = True
+                            is_rel = True
                             break
-                if matches_metric or len(m_data) <= 2:
-                    metric_summary = ", ".join(f"{k}={v}" for k, v in m_data.items())
-                    supporting.append(AtomicPoint(
-                        id=str(uuid.uuid4()),
-                        text=f"Verified metrics: {metric_summary}",
-                        source_file=rel_m_path,
-                        source_line=1,
-                        source_quote=m_content,
-                    ))
+                    if is_rel or len(m_data) <= 4:
+                        clean_val = f"{v}" if not isinstance(v, list) else f"[{', '.join(str(x) for x in v)}]"
+                        supporting.append(AtomicPoint(
+                            id=str(uuid.uuid4()),
+                            text=f"Verified metric: {k}={clean_val}",
+                            source_file=rel_m_path,
+                            source_line=1,
+                            source_quote=m_content,
+                        ))
             except Exception:
                 pass
+
 
     return supporting
 

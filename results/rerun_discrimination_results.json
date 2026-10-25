@@ -1,0 +1,763 @@
+{
+  "ordering_holds_count": 2,
+  "total_items": 5,
+  "results": [
+    {
+      "project_id": "task-tracker-api",
+      "topic": "sustained_350_concurrent",
+      "scores": {
+        "strong": 3,
+        "terse": 2,
+        "generic": 0,
+        "wrong_topic": 0
+      },
+      "strict_holds": true,
+      "atomic_points": [
+        {
+          "id": "78785e7f-459a-4020-9c67-2a61b1d190bf",
+          "text": "Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling."
+        },
+        {
+          "id": "78adefa1-e88c-4d27-9d40-d8257c923048",
+          "text": "Uses SQLite WAL mode with SQLAlchemy async engine and pool_size=10."
+        },
+        {
+          "id": "8a500cd4-67ff-45a3-b56c-a8175b01258d",
+          "text": "Verified metric: concurrent_read_req_sec=350"
+        },
+        {
+          "id": "27f0b639-a3cc-4236-b6d1-f9e1944dac40",
+          "text": "Verified metric: db=SQLite"
+        }
+      ],
+      "point_evals": {
+        "strong": {
+          "78785e7f-459a-4020-9c67-2a61b1d190bf": {
+            "matched": true,
+            "quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test"
+          },
+          "78adefa1-e88c-4d27-9d40-d8257c923048": {
+            "matched": true,
+            "quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections"
+          },
+          "8a500cd4-67ff-45a3-b56c-a8175b01258d": {
+            "matched": true,
+            "quote": "reaching 350 read req/sec in our locust test"
+          },
+          "27f0b639-a3cc-4236-b6d1-f9e1944dac40": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "terse": {
+          "78785e7f-459a-4020-9c67-2a61b1d190bf": {
+            "matched": true,
+            "quote": "Enabled SQLite WAL mode and set pool_size=10"
+          },
+          "78adefa1-e88c-4d27-9d40-d8257c923048": {
+            "matched": true,
+            "quote": "Enabled SQLite WAL mode and set pool_size=10"
+          },
+          "8a500cd4-67ff-45a3-b56c-a8175b01258d": {
+            "matched": false,
+            "quote": ""
+          },
+          "27f0b639-a3cc-4236-b6d1-f9e1944dac40": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "generic": {
+          "78785e7f-459a-4020-9c67-2a61b1d190bf": {
+            "matched": false,
+            "quote": ""
+          },
+          "78adefa1-e88c-4d27-9d40-d8257c923048": {
+            "matched": false,
+            "quote": ""
+          },
+          "8a500cd4-67ff-45a3-b56c-a8175b01258d": {
+            "matched": false,
+            "quote": ""
+          },
+          "27f0b639-a3cc-4236-b6d1-f9e1944dac40": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "wrong_topic": {
+          "78785e7f-459a-4020-9c67-2a61b1d190bf": {
+            "matched": false,
+            "quote": ""
+          },
+          "78adefa1-e88c-4d27-9d40-d8257c923048": {
+            "matched": false,
+            "quote": ""
+          },
+          "8a500cd4-67ff-45a3-b56c-a8175b01258d": {
+            "matched": false,
+            "quote": ""
+          },
+          "27f0b639-a3cc-4236-b6d1-f9e1944dac40": {
+            "matched": false,
+            "quote": ""
+          }
+        }
+      }
+    },
+    {
+      "project_id": "mini-dns-resolver",
+      "topic": "resolves_cached_dns",
+      "scores": {
+        "strong": 1,
+        "terse": 2,
+        "generic": 0,
+        "wrong_topic": 0
+      },
+      "strict_holds": false,
+      "atomic_points": [
+        {
+          "id": "fdf4e475-f82a-4416-8c6f-0828d9b97295",
+          "text": "Resolves cached DNS queries in under 45ms."
+        },
+        {
+          "id": "427c042e-b89b-442b-967a-1f1fc9ffee07",
+          "text": "Uses Python struct module for unpacking UDP payloads."
+        },
+        {
+          "id": "2bb3dee3-229c-4706-82a2-a65518893491",
+          "text": "In-memory dict cache with TTL expiration."
+        },
+        {
+          "id": "acd0fbdb-7bce-4eab-a112-ebb91abee998",
+          "text": "Verified metric: cached_resolution_ms=45"
+        },
+        {
+          "id": "fc2a555a-af4c-492c-a39c-44a33895a0c4",
+          "text": "Verified metric: records_supported=[A, CNAME]"
+        }
+      ],
+      "point_evals": {
+        "strong": {
+          "fdf4e475-f82a-4416-8c6f-0828d9b97295": {
+            "matched": true,
+            "quote": "resolving cached DNS queries in under 45ms"
+          },
+          "427c042e-b89b-442b-967a-1f1fc9ffee07": {
+            "matched": false,
+            "quote": ""
+          },
+          "2bb3dee3-229c-4706-82a2-a65518893491": {
+            "matched": false,
+            "quote": ""
+          },
+          "acd0fbdb-7bce-4eab-a112-ebb91abee998": {
+            "matched": false,
+            "quote": ""
+          },
+          "fc2a555a-af4c-492c-a39c-44a33895a0c4": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "terse": {
+          "fdf4e475-f82a-4416-8c6f-0828d9b97295": {
+            "matched": true,
+            "quote": "We used an in-memory dict cache with TTL expiration resolving queries in under 45ms"
+          },
+          "427c042e-b89b-442b-967a-1f1fc9ffee07": {
+            "matched": false,
+            "quote": ""
+          },
+          "2bb3dee3-229c-4706-82a2-a65518893491": {
+            "matched": true,
+            "quote": "We used an in-memory dict cache with TTL expiration resolving queries in under 45ms"
+          },
+          "acd0fbdb-7bce-4eab-a112-ebb91abee998": {
+            "matched": false,
+            "quote": ""
+          },
+          "fc2a555a-af4c-492c-a39c-44a33895a0c4": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "generic": {
+          "fdf4e475-f82a-4416-8c6f-0828d9b97295": {
+            "matched": false,
+            "quote": ""
+          },
+          "427c042e-b89b-442b-967a-1f1fc9ffee07": {
+            "matched": false,
+            "quote": ""
+          },
+          "2bb3dee3-229c-4706-82a2-a65518893491": {
+            "matched": false,
+            "quote": ""
+          },
+          "acd0fbdb-7bce-4eab-a112-ebb91abee998": {
+            "matched": false,
+            "quote": ""
+          },
+          "fc2a555a-af4c-492c-a39c-44a33895a0c4": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "wrong_topic": {
+          "fdf4e475-f82a-4416-8c6f-0828d9b97295": {
+            "matched": false,
+            "quote": ""
+          },
+          "427c042e-b89b-442b-967a-1f1fc9ffee07": {
+            "matched": false,
+            "quote": ""
+          },
+          "2bb3dee3-229c-4706-82a2-a65518893491": {
+            "matched": false,
+            "quote": ""
+          },
+          "acd0fbdb-7bce-4eab-a112-ebb91abee998": {
+            "matched": false,
+            "quote": ""
+          },
+          "fc2a555a-af4c-492c-a39c-44a33895a0c4": {
+            "matched": false,
+            "quote": ""
+          }
+        }
+      }
+    },
+    {
+      "project_id": "packet-sniffer",
+      "topic": "verified_features_unpacks_20_byte",
+      "scores": {
+        "strong": 2,
+        "terse": 1,
+        "generic": 0,
+        "wrong_topic": 0
+      },
+      "strict_holds": true,
+      "atomic_points": [
+        {
+          "id": "7ed19d5a-32e5-4625-bc9a-ac7b3b0b82b2",
+          "text": "Unpacks 20-byte IPv4 headers and extracts protocol (TCP/UDP/ICMP)."
+        },
+        {
+          "id": "c8ab185b-0abc-4274-b890-3c31dfa840d0",
+          "text": "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations."
+        },
+        {
+          "id": "2f101bbc-dca8-44f0-bfe1-2913ba914409",
+          "text": "Verified metric: protocols=[IPv4, TCP, UDP]"
+        }
+      ],
+      "point_evals": {
+        "strong": {
+          "7ed19d5a-32e5-4625-bc9a-ac7b3b0b82b2": {
+            "matched": true,
+            "quote": "unpacked the 20-byte IPv4 headers, extracting IP version, IHL, TTL, and source/dest IPs using bit shift operations, and verified protocol extraction for IPv4, TCP, and UDP"
+          },
+          "c8ab185b-0abc-4274-b890-3c31dfa840d0": {
+            "matched": true,
+            "quote": "unpacked the 20-byte IPv4 headers, extracting IP version, IHL, TTL, and source/dest IPs using bit shift operations, and verified protocol extraction for IPv4, TCP, and UDP"
+          },
+          "2f101bbc-dca8-44f0-bfe1-2913ba914409": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "terse": {
+          "7ed19d5a-32e5-4625-bc9a-ac7b3b0b82b2": {
+            "matched": true,
+            "quote": "Unpacked 20-byte IPv4 headers using AF_INET raw sockets to extract TCP and UDP protocol numbers"
+          },
+          "c8ab185b-0abc-4274-b890-3c31dfa840d0": {
+            "matched": false,
+            "quote": ""
+          },
+          "2f101bbc-dca8-44f0-bfe1-2913ba914409": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "generic": {
+          "7ed19d5a-32e5-4625-bc9a-ac7b3b0b82b2": {
+            "matched": false,
+            "quote": ""
+          },
+          "c8ab185b-0abc-4274-b890-3c31dfa840d0": {
+            "matched": false,
+            "quote": ""
+          },
+          "2f101bbc-dca8-44f0-bfe1-2913ba914409": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "wrong_topic": {
+          "7ed19d5a-32e5-4625-bc9a-ac7b3b0b82b2": {
+            "matched": false,
+            "quote": ""
+          },
+          "c8ab185b-0abc-4274-b890-3c31dfa840d0": {
+            "matched": false,
+            "quote": ""
+          },
+          "2f101bbc-dca8-44f0-bfe1-2913ba914409": {
+            "matched": false,
+            "quote": ""
+          }
+        }
+      }
+    },
+    {
+      "project_id": "flow-limiter",
+      "topic": "processes_80_000",
+      "scores": {
+        "strong": 1,
+        "terse": 0,
+        "generic": 0,
+        "wrong_topic": 0
+      },
+      "strict_holds": false,
+      "atomic_points": [
+        {
+          "id": "60ab9fce-9937-4e4e-ad57-314fa81e3199",
+          "text": "Processes 80,000 req/sec with p99 latency < 0.8ms."
+        },
+        {
+          "id": "bdebd20c-a412-4423-99f6-916844c5728d",
+          "text": "Verified metric: req_sec=80000"
+        },
+        {
+          "id": "becc7b6c-42ce-4c0a-bb70-391f50427c6e",
+          "text": "Verified metric: p99_latency_ms=0.8"
+        }
+      ],
+      "point_evals": {
+        "strong": {
+          "60ab9fce-9937-4e4e-ad57-314fa81e3199": {
+            "matched": true,
+            "quote": "processing 80,000 req/sec with p99 latency under 0.8ms"
+          },
+          "bdebd20c-a412-4423-99f6-916844c5728d": {
+            "matched": false,
+            "quote": ""
+          },
+          "becc7b6c-42ce-4c0a-bb70-391f50427c6e": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "terse": {
+          "60ab9fce-9937-4e4e-ad57-314fa81e3199": {
+            "matched": false,
+            "quote": ""
+          },
+          "bdebd20c-a412-4423-99f6-916844c5728d": {
+            "matched": false,
+            "quote": ""
+          },
+          "becc7b6c-42ce-4c0a-bb70-391f50427c6e": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "generic": {
+          "60ab9fce-9937-4e4e-ad57-314fa81e3199": {
+            "matched": false,
+            "quote": ""
+          },
+          "bdebd20c-a412-4423-99f6-916844c5728d": {
+            "matched": false,
+            "quote": ""
+          },
+          "becc7b6c-42ce-4c0a-bb70-391f50427c6e": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "wrong_topic": {
+          "60ab9fce-9937-4e4e-ad57-314fa81e3199": {
+            "matched": false,
+            "quote": ""
+          },
+          "bdebd20c-a412-4423-99f6-916844c5728d": {
+            "matched": false,
+            "quote": ""
+          },
+          "becc7b6c-42ce-4c0a-bb70-391f50427c6e": {
+            "matched": false,
+            "quote": ""
+          }
+        }
+      }
+    },
+    {
+      "project_id": "raft-kv",
+      "topic": "max_stable_write",
+      "scores": {
+        "strong": 2,
+        "terse": 2,
+        "generic": 0,
+        "wrong_topic": 0
+      },
+      "strict_holds": false,
+      "atomic_points": [
+        {
+          "id": "5b71f365-5772-4f98-ba28-cec9cbc1f42a",
+          "text": "Max stable write throughput: 45,000 req/sec."
+        },
+        {
+          "id": "13b65112-f115-460b-b3fc-18b34850a27c",
+          "text": "Verified metric: max_req_sec=45000"
+        },
+        {
+          "id": "1718b93d-cc50-44a3-b8c1-92d6f9e54319",
+          "text": "Verified metric: election_timeout_ms=[150, 300]"
+        },
+        {
+          "id": "b20bba57-d7fa-4363-aeec-3256ce663926",
+          "text": "Verified metric: linearizability=0.9999"
+        },
+        {
+          "id": "0f841e98-01ca-40d2-902d-89e93f289e8f",
+          "text": "Verified metric: cluster_size=3"
+        }
+      ],
+      "point_evals": {
+        "strong": {
+          "5b71f365-5772-4f98-ba28-cec9cbc1f42a": {
+            "matched": true,
+            "quote": "sustained a maximum stable write throughput of 45,000 req/sec"
+          },
+          "13b65112-f115-460b-b3fc-18b34850a27c": {
+            "matched": false,
+            "quote": ""
+          },
+          "1718b93d-cc50-44a3-b8c1-92d6f9e54319": {
+            "matched": false,
+            "quote": ""
+          },
+          "b20bba57-d7fa-4363-aeec-3256ce663926": {
+            "matched": false,
+            "quote": ""
+          },
+          "0f841e98-01ca-40d2-902d-89e93f289e8f": {
+            "matched": true,
+            "quote": "3-node cluster"
+          }
+        },
+        "terse": {
+          "5b71f365-5772-4f98-ba28-cec9cbc1f42a": {
+            "matched": true,
+            "quote": "Tested on 3 nodes, sustaining 45,000 req/sec write throughput"
+          },
+          "13b65112-f115-460b-b3fc-18b34850a27c": {
+            "matched": true,
+            "quote": "Tested on 3 nodes, sustaining 45,000 req/sec write throughput"
+          },
+          "1718b93d-cc50-44a3-b8c1-92d6f9e54319": {
+            "matched": false,
+            "quote": ""
+          },
+          "b20bba57-d7fa-4363-aeec-3256ce663926": {
+            "matched": false,
+            "quote": ""
+          },
+          "0f841e98-01ca-40d2-902d-89e93f289e8f": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "generic": {
+          "5b71f365-5772-4f98-ba28-cec9cbc1f42a": {
+            "matched": false,
+            "quote": ""
+          },
+          "13b65112-f115-460b-b3fc-18b34850a27c": {
+            "matched": false,
+            "quote": ""
+          },
+          "1718b93d-cc50-44a3-b8c1-92d6f9e54319": {
+            "matched": false,
+            "quote": ""
+          },
+          "b20bba57-d7fa-4363-aeec-3256ce663926": {
+            "matched": false,
+            "quote": ""
+          },
+          "0f841e98-01ca-40d2-902d-89e93f289e8f": {
+            "matched": false,
+            "quote": ""
+          }
+        },
+        "wrong_topic": {
+          "5b71f365-5772-4f98-ba28-cec9cbc1f42a": {
+            "matched": false,
+            "quote": ""
+          },
+          "13b65112-f115-460b-b3fc-18b34850a27c": {
+            "matched": false,
+            "quote": ""
+          },
+          "1718b93d-cc50-44a3-b8c1-92d6f9e54319": {
+            "matched": false,
+            "quote": ""
+          },
+          "b20bba57-d7fa-4363-aeec-3256ce663926": {
+            "matched": false,
+            "quote": ""
+          },
+          "0f841e98-01ca-40d2-902d-89e93f289e8f": {
+            "matched": false,
+            "quote": ""
+          }
+        }
+      }
+    }
+  ],
+  "telemetry_logs": [
+    {
+      "timestamp": "2026-10-25T09:02:04.697780+00:00",
+      "project": "task-tracker-api",
+      "tier": "strong",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1310,
+      "output_tokens": 332,
+      "total_tokens": 1642,
+      "total_ms": 31293.4522999858,
+      "score": 3
+    },
+    {
+      "timestamp": "2026-10-25T09:02:25.405778+00:00",
+      "project": "task-tracker-api",
+      "tier": "terse",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1255,
+      "output_tokens": 292,
+      "total_tokens": 1547,
+      "total_ms": 20702.84189999802,
+      "score": 2
+    },
+    {
+      "timestamp": "2026-10-25T09:02:45.488904+00:00",
+      "project": "task-tracker-api",
+      "tier": "generic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1258,
+      "output_tokens": 295,
+      "total_tokens": 1553,
+      "total_ms": 20080.12699999381,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:03:05.542862+00:00",
+      "project": "task-tracker-api",
+      "tier": "wrong_topic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1268,
+      "output_tokens": 281,
+      "total_tokens": 1549,
+      "total_ms": 20050.721699983114,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:03:28.806656+00:00",
+      "project": "mini-dns-resolver",
+      "tier": "strong",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1367,
+      "output_tokens": 335,
+      "total_tokens": 1702,
+      "total_ms": 23259.654199995566,
+      "score": 1
+    },
+    {
+      "timestamp": "2026-10-25T09:03:54.281699+00:00",
+      "project": "mini-dns-resolver",
+      "tier": "terse",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1329,
+      "output_tokens": 387,
+      "total_tokens": 1716,
+      "total_ms": 25462.896000011824,
+      "score": 2
+    },
+    {
+      "timestamp": "2026-10-25T09:04:18.663451+00:00",
+      "project": "mini-dns-resolver",
+      "tier": "generic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1324,
+      "output_tokens": 354,
+      "total_tokens": 1678,
+      "total_ms": 24378.290199994808,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:04:39.062930+00:00",
+      "project": "mini-dns-resolver",
+      "tier": "wrong_topic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1333,
+      "output_tokens": 290,
+      "total_tokens": 1623,
+      "total_ms": 20396.234199986793,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:05:02.827515+00:00",
+      "project": "packet-sniffer",
+      "tier": "strong",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1217,
+      "output_tokens": 343,
+      "total_tokens": 1560,
+      "total_ms": 23761.808299983386,
+      "score": 2
+    },
+    {
+      "timestamp": "2026-10-25T09:05:22.079493+00:00",
+      "project": "packet-sniffer",
+      "tier": "terse",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1177,
+      "output_tokens": 251,
+      "total_tokens": 1428,
+      "total_ms": 19248.2033999986,
+      "score": 1
+    },
+    {
+      "timestamp": "2026-10-25T09:05:37.594767+00:00",
+      "project": "packet-sniffer",
+      "tier": "generic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1168,
+      "output_tokens": 220,
+      "total_tokens": 1388,
+      "total_ms": 15512.235600006534,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:05:53.894898+00:00",
+      "project": "packet-sniffer",
+      "tier": "wrong_topic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1173,
+      "output_tokens": 225,
+      "total_tokens": 1398,
+      "total_ms": 16296.975400007796,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:06:11.138035+00:00",
+      "project": "flow-limiter",
+      "tier": "strong",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1255,
+      "output_tokens": 246,
+      "total_tokens": 1501,
+      "total_ms": 17240.25599999004,
+      "score": 1
+    },
+    {
+      "timestamp": "2026-10-25T09:06:27.770389+00:00",
+      "project": "flow-limiter",
+      "tier": "terse",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1197,
+      "output_tokens": 233,
+      "total_tokens": 1430,
+      "total_ms": 16627.838200016413,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:06:46.815497+00:00",
+      "project": "flow-limiter",
+      "tier": "generic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1197,
+      "output_tokens": 244,
+      "total_tokens": 1441,
+      "total_ms": 19042.080599989276,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:07:04.982946+00:00",
+      "project": "flow-limiter",
+      "tier": "wrong_topic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1200,
+      "output_tokens": 234,
+      "total_tokens": 1434,
+      "total_ms": 18164.770399976987,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:07:31.156571+00:00",
+      "project": "raft-kv",
+      "tier": "strong",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1534,
+      "output_tokens": 367,
+      "total_tokens": 1901,
+      "total_ms": 26170.61339999782,
+      "score": 2
+    },
+    {
+      "timestamp": "2026-10-25T09:07:55.030987+00:00",
+      "project": "raft-kv",
+      "tier": "terse",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1468,
+      "output_tokens": 340,
+      "total_tokens": 1808,
+      "total_ms": 23871.262200002093,
+      "score": 2
+    },
+    {
+      "timestamp": "2026-10-25T09:08:18.520276+00:00",
+      "project": "raft-kv",
+      "tier": "generic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1463,
+      "output_tokens": 337,
+      "total_tokens": 1800,
+      "total_ms": 23486.40660001547,
+      "score": 0
+    },
+    {
+      "timestamp": "2026-10-25T09:08:40.028527+00:00",
+      "project": "raft-kv",
+      "tier": "wrong_topic",
+      "model": "qwen2.5:7b",
+      "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+      "prompt_tokens": 1469,
+      "output_tokens": 300,
+      "total_tokens": 1769,
+      "total_ms": 21505.048000020906,
+      "score": 0
+    }
+  ]
+}

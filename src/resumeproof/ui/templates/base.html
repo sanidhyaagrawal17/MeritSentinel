@@ -18,6 +18,7 @@
       {% if user_id %}
       <a href="/review/{{ user_id }}" class="{% if nav_active == 'review' %}active{% endif %}">Claim Review</a>
       <a href="/dashboard/{{ user_id }}" class="{% if nav_active == 'dashboard' %}active{% endif %}">Mastery Dashboard</a>
+      <a href="/tailor/{{ user_id }}" class="{% if nav_active == 'tailor' %}active{% endif %}">Tailor & Verify</a>
       {% endif %}
     </nav>
   </header>

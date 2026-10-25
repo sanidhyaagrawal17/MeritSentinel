@@ -59,5 +59,24 @@ class Settings(BaseModel):
         description="Set to True in offline CI/testing to prevent any network or Ollama calls"
     )
 
+    # Web UI & Security Settings
+    ui_host: str = Field(
+        default_factory=lambda: os.getenv("RESUMEPROOF_UI_HOST", "127.0.0.1"),
+        description="Host interface to bind the Web UI (defaults strictly to 127.0.0.1 for local isolation)"
+    )
+    ui_port: int = Field(
+        default_factory=lambda: int(os.getenv("RESUMEPROOF_UI_PORT", "8000")),
+        description="Port for Web UI"
+    )
+    upload_dir: Path = Field(
+        default_factory=lambda: Path(os.getenv("RESUMEPROOF_UPLOAD_DIR", ".data_uploads")),
+        description="Directory for temporary uploaded user resumes (git-ignored)"
+    )
+    max_upload_size_bytes: int = Field(
+        default=5 * 1024 * 1024,
+        description="Maximum allowed upload file size in bytes (5MB)"
+    )
+
+
 # Global singleton settings
 settings = Settings()

@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}ResumeProof | Tailor & Strict Verifier{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
+  <div>
+    <h1>Resume Tailoring & Strict Verifier</h1>
+    <p class="subtitle" style="margin-bottom: 0;">Map confirmed, mastery-verified candidate claims against target Job Descriptions. Zero LLM in the export blocking path.</p>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="/dashboard/{{ user_id }}" class="btn btn-secondary">View Dashboard</a>
+    <a href="/review/{{ user_id }}" class="btn btn-secondary">Review Claims</a>
+  </div>
+</div>
+
+<!-- Target Job Description Input Form -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="margin: 0; font-size: 1.15rem;">Target Job Description</h2>
+    <span class="badge badge-neutral">Deterministic Matcher</span>
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+    Paste the target job description or requirements below. The tailoring engine extracts requirements and matches only against claims that have achieved mastery threshold (Score &ge; 2.5, Confidence &ge; 0.5) and confirmed profile facts.
+  </p>
+
+  <form action="/tailor/{{ user_id }}" method="POST">
+    <div class="form-group">
+      <label for="jd_text">Job Description / Requirements Specification</label>
+      <textarea id="jd_text" name="jd_text" rows="7" placeholder="Paste requirements here (e.g., 'Looking for a backend engineer experienced in building REST APIs with FastAPI, SQLite connection pooling, and low-latency socket networking...')" required>{{ jd_text or "" }}</textarea>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+      <button type="submit" class="btn btn-primary">Tailor &amp; Verify Resume</button>
+    </div>
+  </form>
+</div>
+
+{% if gap_report %}
+<!-- Gap Analysis Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-val" style="color: #fff;">{{ gap_report.total_requirements }}</div>
+    <div class="stat-label">Total Requirements</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--success-text);">{{ gap_report.matched_and_defensible|length }}</div>
+    <div class="stat-label">Matched &amp; Defensible</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--warning-text);">{{ gap_report.needs_interview_practice|length }}</div>
+    <div class="stat-label">Needs Practice</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--danger-text);">{{ gap_report.unsupported_gaps|length }}</div>
+    <div class="stat-label">Unsupported Gaps</div>
+  </div>
+</div>
+
+<!-- Defensibility Ratio Bar -->
+<div class="card" style="margin-bottom: 2rem; background: linear-gradient(180deg, rgba(24, 24, 27, 0.9) 0%, rgba(18, 18, 21, 0.9) 100%);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="margin: 0; font-size: 1.15rem;">Defensibility &amp; Coverage Index</h2>
+    <span class="badge {% if gap_report.defensibility_ratio >= 0.7 %}badge-success{% elif gap_report.defensibility_ratio >= 0.4 %}badge-warning{% else %}badge-danger{% endif %}">
+      {{ (gap_report.defensibility_ratio * 100)|int }}% Defensible
+    </span>
+  </div>
+  <div style="background: #27272a; border-radius: var(--radius-sm); height: 8px; width: 100%; overflow: hidden;">
+    <div style="background: {% if gap_report.defensibility_ratio >= 0.7 %}var(--success-text){% elif gap_report.defensibility_ratio >= 0.4 %}var(--warning-text){% else %}var(--danger-text){% endif %}; height: 100%; width: {{ (gap_report.defensibility_ratio * 100)|int }}%;"></div>
+  </div>
+</div>
+
+<!-- Gap Report Itemized Breakdown -->
+<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 2rem;">
+  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border);">
+    <h2 style="margin: 0; font-size: 1.1rem;">JD Requirements Gap Analysis</h2>
+  </div>
+
+  <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Requirement</th>
+          <th style="width: 170px;">Defensibility Status</th>
+          <th style="width: 180px;">Matched Claim ID</th>
+          <th>Verification Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in gap_report.matched_and_defensible %}
+        <tr>
+          <td><strong style="color: #fff;">{{ item.requirement_text }}</strong></td>
+          <td><span class="badge badge-success">Matched &amp; Defensible</span></td>
+          <td><code>{{ item.supporting_claim_id }}</code></td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ item.reason }}</td>
+        </tr>
+        {% endfor %}
+        {% for item in gap_report.needs_interview_practice %}
+        <tr>
+          <td><strong style="color: #fff;">{{ item.requirement_text }}</strong></td>
+          <td><span class="badge badge-warning">Needs Practice</span></td>
+          <td><code>{{ item.supporting_claim_id }}</code></td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ item.reason }}</td>
+        </tr>
+        {% endfor %}
+        {% for item in gap_report.unsupported_gaps %}
+        <tr>
+          <td><strong style="color: #fff;">{{ item.requirement_text }}</strong></td>
+          <td><span class="badge badge-danger">Unsupported Gap</span></td>
+          <td><span style="color: var(--text-muted);">&mdash;</span></td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ item.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if verifier_report %}
+<!-- Strict Verifier Status Banner -->
+<div class="card" style="margin-bottom: 2rem; border-left: 4px solid {% if verifier_report.passed %}var(--success-text){% else %}var(--danger-text){% endif %};">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h2 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
+        {% if verifier_report.passed %}
+        <span style="color: var(--success-text);">&#10003; Strict Deterministic Verifier: PASSED</span>
+        {% else %}
+        <span style="color: var(--danger-text);">&#9888; Strict Verifier: EXPORT BLOCKED</span>
+        {% endif %}
+      </h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
+        {% if verifier_report.passed %}
+        All {{ verifier_report.verified_count }} sentence(s) strictly ground to verified candidate claims and confirmed profile facts. 0 unsupported assertions detected.
+        {% else %}
+        {{ verifier_report.blocked_count }} of {{ verifier_report.total_sentences }} sentence(s) contain ungrounded metrics, unconfirmed tools, or unsupported claims. Single-page PDF export is strictly blocked.
+        {% endif %}
+      </p>
+    </div>
+
+    <!-- Export Actions -->
+    <div style="display: flex; gap: 0.75rem;">
+      <a href="/tailor/{{ user_id }}/download_md" class="btn btn-secondary">
+        Download Markdown
+      </a>
+      {% if verifier_report.passed %}
+      <a href="/tailor/{{ user_id }}/download_pdf" class="btn btn-primary" style="background: var(--success-text); color: #000; font-weight: 600;">
+        Download ATS PDF
+      </a>
+      {% else %}
+      <button class="btn btn-secondary" disabled title="Export blocked: Resolve unverified sentences first" style="opacity: 0.4; cursor: not-allowed;">
+        PDF Export Blocked
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not verifier_report.passed %}
+  <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius-sm); color: var(--danger-text); font-size: 0.85rem;">
+    <strong>Blocking Violations:</strong>
+    <ul style="margin: 0.35rem 0 0 1.25rem;">
+      {% for reason in verifier_report.blocking_summary %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Live Sentence-by-Sentence Audit Diff -->
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <div>
+      <h2 style="margin: 0; font-size: 1.15rem;">Live Verifier Audit Diff</h2>
+      <div style="color: var(--text-muted); font-size: 0.85rem;">Every sentence evaluated independently against candidate ground-truth claims and facts.</div>
+    </div>
+    <span class="badge {% if verifier_report.passed %}badge-success{% else %}badge-warning{% endif %}">
+      {{ verifier_report.verified_count }} / {{ verifier_report.total_sentences }} Verified
+    </span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+    {% for res in verifier_report.sentence_results %}
+    <div style="padding: 0.85rem 1rem; border-radius: var(--radius-sm); border: 1px solid {% if res.status == 'VERIFIED' %}var(--success-border){% else %}var(--danger-border){% endif %}; background: {% if res.status == 'VERIFIED' %}rgba(16, 185, 129, 0.04){% else %}rgba(239, 68, 68, 0.04){% endif %};">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; color: #fff; font-size: 0.95rem;">
+            {{ res.sentence_text }}
+          </div>
+          {% if res.extracted_entities.tools or res.extracted_entities.numbers %}
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem;">
+            {% for t in res.extracted_entities.tools %}
+            <span class="badge badge-neutral" style="font-size: 0.65rem;">Tool: {{ t }}</span>
+            {% endfor %}
+            {% for n in res.extracted_entities.numbers %}
+            <span class="badge badge-warning" style="font-size: 0.65rem;">Metric: {{ n }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if res.blocking_reasons %}
+          <div style="margin-top: 0.5rem; color: var(--danger-text); font-size: 0.8rem;">
+            {% for r in res.blocking_reasons %}
+            <div>&bull; {{ r }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div>
+          {% if res.status == 'VERIFIED' %}
+          <span class="badge badge-success">VERIFIED</span>
+          {% if res.supporting_claim_id %}
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; text-align: right;">
+            <code>{{ res.supporting_claim_id }}</code>
+          </div>
+          {% endif %}
+          {% else %}
+          <span class="badge badge-danger">BLOCKED</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Tailored Resume Markdown Preview -->
+{% if tailored_markdown %}
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="margin: 0; font-size: 1.15rem;">Tailored Resume Source Preview</h2>
+    <span class="badge badge-neutral">Markdown</span>
+  </div>
+  <pre style="background: #09090b; border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 1rem; color: #e4e4e7; font-size: 0.85rem; line-height: 1.5; overflow-x: auto; white-space: pre-wrap;">{{ tailored_markdown }}</pre>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
