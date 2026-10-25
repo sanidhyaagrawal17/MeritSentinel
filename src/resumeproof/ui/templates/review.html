@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}ResumeProof | Claim Review & Grounding{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
+  <div>
+    <h1>Candidate Claim Verification</h1>
+    <p class="subtitle" style="margin-bottom: 0;">Review parsed claims for User <code>{{ user_id }}</code>. Confirm claims to include in the technical interview audit.</p>
+  </div>
+  <form action="/review/{{ user_id }}/start_interview" method="POST">
+    <input type="hidden" name="persona" value="{{ persona_id }}">
+    <button type="submit" class="btn btn-primary">Start Technical Interview &rarr;</button>
+  </form>
+</div>
+
+<!-- Candidate Facts Overview -->
+{% if facts %}
+<div class="card" style="margin-bottom: 2rem;">
+  <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.75rem;">Extracted Profile Facts</div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    {% for f in facts %}
+    <span class="badge badge-neutral" title="Line {{ f.source_line }}">{{ f.fact_type.value }}: {{ f.value }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Claims Review Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center;">
+    <h2 style="margin: 0; font-size: 1.1rem;">Technical Claims ({{ claims|length }})</h2>
+    <span style="font-size: 0.85rem; color: var(--text-muted);">Confirm or reject items to tune the interview planner</span>
+  </div>
+
+  <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 140px;">Type</th>
+          <th>Claim Statement</th>
+          <th style="width: 180px;">Tools & Metrics</th>
+          <th style="width: 120px;">Status</th>
+          <th style="width: 160px; text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in claims %}
+        <tr id="claim-{{ c.id }}">
+          <td>
+            <span class="badge badge-neutral">{{ c.claim_type.value }}</span>
+            {% if c.project_id %}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{{ c.project_id }}</code></div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="color: #fff; font-weight: 500;">{{ c.text }}</div>
+            {% if c.source_line %}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Source line: {{ c.source_line }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+              {% for t in c.tools %}
+              <code>{{ t }}</code>
+              {% endfor %}
+              {% for m in c.metric_values %}
+              <span class="badge badge-warning" style="font-size: 0.7rem;">{{ m }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td>
+            {% if c.status.value == 'confirmed' %}
+            <span class="badge badge-success">Confirmed</span>
+            {% elif c.status.value == 'rejected' %}
+            <span class="badge badge-danger">Rejected</span>
+            {% else %}
+            <span class="badge badge-warning">Pending</span>
+            {% endif %}
+          </td>
+          <td style="text-align: right;">
+            <div style="display: inline-flex; gap: 0.4rem;">
+              <button 
+                class="btn btn-success btn-sm"
+                hx-post="/review/{{ user_id }}/confirm_claim"
+                hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id }}"}'
+                hx-target="#claim-{{ c.id }}"
+                hx-swap="outerHTML">
+                Confirm
+              </button>
+              <button 
+                class="btn btn-danger btn-sm"
+                hx-post="/review/{{ user_id }}/reject_claim"
+                hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id }}"}'
+                hx-target="#claim-{{ c.id }}"
+                hx-swap="outerHTML">
+                Reject
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

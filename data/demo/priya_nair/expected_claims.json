@@ -1,0 +1,125 @@
+{
+  "persona_id": "priya_nair",
+  "expected_claims": [
+    {
+      "text": "Deployed real-time tabular feature pipelines with low inference latency.",
+      "claim_type": "experience_claim",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Tuned GBDT and ONNX runtime inference engines.",
+      "claim_type": "experience_claim",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Streamed feature vectors achieving p95 lookup latency under 4.2ms across 2 million customer keys.",
+      "claim_type": "project_metric",
+      "project_id": "feature-forge",
+      "is_trap": false
+    },
+    {
+      "text": "Processed 10 TB/day of streaming telemetry logs with zero buffering lag.",
+      "claim_type": "project_metric",
+      "project_id": "feature-forge",
+      "is_trap": true
+    },
+    {
+      "text": "Improved classification AUC-ROC from 0.81 to 0.88 using LightGBM feature interaction trees.",
+      "claim_type": "project_metric",
+      "project_id": "tabular-boost",
+      "is_trap": false
+    },
+    {
+      "text": "Accelerated PyTorch model scoring 3.4x using ONNX Runtime graph optimizations.",
+      "claim_type": "project_metric",
+      "project_id": "tabular-boost",
+      "is_trap": false
+    },
+    {
+      "text": "Distributed training across 16 GPUs using PyTorch FSDP.",
+      "claim_type": "project_metric",
+      "project_id": "tabular-boost",
+      "is_trap": true
+    },
+    {
+      "text": "Trained 70B parameter LLM from scratch using DeepSpeed and fine-tuned custom diffusion models.",
+      "claim_type": "project_metric",
+      "project_id": "tabular-boost",
+      "is_trap": true
+    },
+    {
+      "text": "Python",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "SQL",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "PyTorch",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "LightGBM",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "ONNX Runtime",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Kafka",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "DuckDB",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Pandas",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "NumPy",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Docker",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Git",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "MLflow",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    }
+  ]
+}

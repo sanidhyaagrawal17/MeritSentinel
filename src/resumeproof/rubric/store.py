@@ -12,6 +12,13 @@ class RubricStore:
 
     def __init__(self, db: Database):
         self.db = db
+        self._ensure_schema()
+
+    def _ensure_schema(self) -> None:
+        with self.db.transaction() as conn:
+            columns = [c[1] for c in conn.execute("PRAGMA table_info(rubrics)").fetchall()]
+            if columns and "atomic_points" not in columns:
+                conn.execute("ALTER TABLE rubrics ADD COLUMN atomic_points TEXT DEFAULT '[]'")
 
     def save_rubric(self, item: RubricItem) -> None:
         with self.db.transaction() as conn:
@@ -19,8 +26,8 @@ class RubricStore:
                 """
                 INSERT OR REPLACE INTO rubrics (
                     id, project_id, persona_id, topic, source_file,
-                    source_line, source_quote, criteria, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_line, source_quote, criteria, created_at, atomic_points
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     item.id,
@@ -32,6 +39,7 @@ class RubricStore:
                     item.source_quote,
                     json.dumps(item.criteria),
                     item.created_at.isoformat(),
+                    json.dumps([p.model_dump() for p in item.atomic_points]),
                 )
             )
 
@@ -40,6 +48,13 @@ class RubricStore:
             self.save_rubric(item)
 
     def _hydrate(self, r) -> RubricItem:
+        from resumeproof.schemas.rubric import AtomicPoint
+        raw_pts = r["atomic_points"] if "atomic_points" in r.keys() and r["atomic_points"] else "[]"
+        try:
+            atomic_points = [AtomicPoint.model_validate(p) for p in json.loads(raw_pts)]
+        except Exception:
+            atomic_points = []
+
         return RubricItem(
             id=r["id"],
             project_id=r["project_id"],
@@ -49,8 +64,10 @@ class RubricStore:
             source_line=r["source_line"],
             source_quote=r["source_quote"],
             criteria={int(k): str(v) for k, v in json.loads(r["criteria"]).items()},
+            atomic_points=atomic_points,
             created_at=datetime.fromisoformat(r["created_at"]),
         )
+
 
     def get_rubric_by_id(self, rubric_id: str) -> Optional[RubricItem]:
         with self.db.transaction() as conn:

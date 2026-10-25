@@ -35,8 +35,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "-v --cov=resumeproof --cov-report=term-missing"
+addopts = "-v --cov=resumeproof --cov-report=term-missing -m \"not real_model\""
 markers = [
     "parsing_pipeline: tests validating schema and pipeline mechanics via FakeLLMClient",
-    "real_model: tests running against live local Ollama LLMs",
+    "real_model: tests running against live local Ollama LLMs (skipped by default; run with `pytest -m real_model`)",
 ]

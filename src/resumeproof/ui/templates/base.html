@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ResumeProof | Truth-First Technical Interview Engine{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmReNpAssUSEmWrrErMM230JNXl0hJxj6VXTSJm" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <a href="/" class="brand">
+      <span>ResumeProof</span>
+      <span class="brand-badge">Audit AI</span>
+    </a>
+    <nav>
+      <a href="/" class="{% if nav_active == 'home' %}active{% endif %}">Upload & Demo</a>
+      {% if user_id %}
+      <a href="/review/{{ user_id }}" class="{% if nav_active == 'review' %}active{% endif %}">Claim Review</a>
+      <a href="/dashboard/{{ user_id }}" class="{% if nav_active == 'dashboard' %}active{% endif %}">Mastery Dashboard</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

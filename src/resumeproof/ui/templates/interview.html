@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}ResumeProof | Technical Mock Interview{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+  <div>
+    <h1>Technical Verification Interview</h1>
+    <p class="subtitle" style="margin-bottom: 0;">Session <code>{{ session.id[:8] }}</code> &bull; Candidate: <strong>{{ session.persona_id }}</strong></p>
+  </div>
+  <div style="display: flex; align-items: center; gap: 1rem;">
+    <div id="grade-status">
+      {% if has_pending_grades %}
+      <div hx-get="/interview/{{ session.id }}/grade_status" hx-trigger="every 1s" hx-swap="outerHTML" class="badge badge-pending">
+        ⏳ Background Grading Active
+      </div>
+      {% else %}
+      <div class="badge badge-success">
+        ✓ All Turns Graded
+      </div>
+      {% endif %}
+    </div>
+    <a href="/dashboard/{{ session.user_id }}" class="btn btn-secondary btn-sm">Mastery Dashboard &rarr;</a>
+  </div>
+</div>
+
+<!-- Progress Bar -->
+<div style="background: #18181b; border-radius: var(--radius-sm); height: 6px; width: 100%; margin-bottom: 2rem; overflow: hidden;">
+  <div style="background: var(--accent-color); height: 100%; width: {{ (turns|length / session.budget * 100)|int }}%;"></div>
+</div>
+
+{% if current_question %}
+<!-- Active Question Card -->
+<div class="card" style="border-color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.08);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span class="badge badge-neutral">Turn {{ (turns|length + 1) }} of {{ session.budget }}</span>
+      <span class="badge badge-warning">Priority: {{ current_question.priority.value }}</span>
+      {% if current_question.is_followup %}
+      <span class="badge badge-danger">Follow-up</span>
+      {% endif %}
+    </div>
+    {% if current_question.latency_ms %}
+    <span style="font-size: 0.75rem; color: var(--text-muted);">Generated in {{ current_question.latency_ms|round(1) }}ms</span>
+    {% endif %}
+  </div>
+
+  <div style="margin-bottom: 1.5rem;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">Target Claim</div>
+    <div style="color: #d4d4d8; font-size: 0.95rem; background: rgba(255, 255, 255, 0.03); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--surface-border);">
+      {{ target_claim_text }}
+    </div>
+  </div>
+
+  <div style="margin-bottom: 1.5rem;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent-color); font-weight: 600; margin-bottom: 0.5rem;">Technical Interview Question</div>
+    <div style="font-size: 1.2rem; font-weight: 600; color: #fff; line-height: 1.4;">
+      {{ current_question.question_text }}
+    </div>
+  </div>
+
+  <form action="/interview/{{ session.id }}/answer" method="POST">
+    <input type="hidden" name="question_id" value="{{ current_question.id }}">
+    <input type="hidden" name="claim_id" value="{{ current_question.claim_id }}">
+    <input type="hidden" name="priority" value="{{ current_question.priority.value }}">
+    <input type="hidden" name="question_text" value="{{ current_question.question_text }}">
+    <input type="hidden" name="is_followup" value="{{ '1' if current_question.is_followup else '0' }}">
+    <input type="hidden" name="rubric_id" value="{{ current_question.rubric_id or '' }}">
+    <input type="hidden" name="project_id" value="{{ current_question.project_id or '' }}">
+
+    <div class="form-group">
+      <label for="answer_text">Your Technical Response</label>
+      <textarea id="answer_text" name="answer_text" placeholder="Detail your exact architectural mechanisms, configurations, and verified parameters..." required></textarea>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center;">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">Async background grading enables instant progression to the next question.</span>
+      <button type="submit" class="btn btn-primary">Submit Answer & Continue &rarr;</button>
+    </div>
+  </form>
+</div>
+{% else %}
+<!-- Concluded Banner -->
+<div class="card" style="text-align: center; padding: 3rem 2rem;">
+  <h2>Interview Session Completed</h2>
+  <p class="subtitle" style="margin-bottom: 1.5rem;">All planned questions for this session budget have been executed.</p>
+  <a href="/dashboard/{{ session.user_id }}" class="btn btn-primary">View Full Mastery Matrix Dashboard &rarr;</a>
+</div>
+{% endif %}
+
+<!-- Turn History -->
+{% if turns %}
+<div style="margin-top: 3rem;">
+  <h2 style="margin-bottom: 1.25rem;">Interview Turns & Evaluation Audit</h2>
+  
+  <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+    {% for t in turns|reverse %}
+    <div class="card" style="margin-bottom: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="badge badge-neutral">Turn {{ t.turn_index }}</span>
+          {% if t.grade %}
+            {% if t.grade.raw_score == 4 %}
+            <span class="badge badge-success">Score: 4 / 4 (Complete)</span>
+            {% elif t.grade.raw_score == 3 %}
+            <span class="badge badge-success">Score: 3 / 4 (Competent)</span>
+            {% elif t.grade.raw_score == 2 %}
+            <span class="badge badge-warning">Score: 2 / 4 (Partial)</span>
+            {% elif t.grade.raw_score == 1 %}
+            <span class="badge badge-warning">Score: 1 / 4 (Surface)</span>
+            {% else %}
+            <span class="badge badge-danger">Score: 0 / 4 (Unverified / Trap)</span>
+            {% endif %}
+          {% else %}
+          <span class="badge badge-pending">⏳ Grading in Background</span>
+          {% endif %}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          Turn Latency: {{ t.turn_latency_ms|round(1) }}ms
+          {% if t.grading_latency_ms %}
+          &bull; Grading: {{ t.grading_latency_ms|round(1) }}ms
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="margin-bottom: 0.75rem;">
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Q: {{ t.question.question_text }}</div>
+      </div>
+
+      <div style="margin-bottom: 0.75rem;">
+        <blockquote style="margin: 0; color: #e4e4e7;">
+          "{{ t.answer.answer_text }}"
+        </blockquote>
+      </div>
+
+      {% if t.grade %}
+      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; margin-top: 0.75rem;">
+        {% if t.grade.evidence_quote %}
+        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--success-text); font-weight: 600; margin-bottom: 0.25rem;">Verbatim Evidence Quote</div>
+        <div style="font-size: 0.85rem; color: #34d399; margin-bottom: 0.5rem;"><code>"{{ t.grade.evidence_quote }}"</code></div>
+        {% endif %}
+        {% if t.grade.feedback %}
+        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem;">Technical Feedback</div>
+        <div style="font-size: 0.85rem; color: #a1a1aa;">{{ t.grade.feedback }}</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}ResumeProof | Mastery Matrix Dashboard{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
+  <div>
+    <h1>Defensibility & Mastery Dashboard</h1>
+    <p class="subtitle" style="margin-bottom: 0;">Audit results and claim verification matrix for candidate <code>{{ user_id }}</code>.</p>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="/review/{{ user_id }}" class="btn btn-secondary">Review Claims</a>
+    <a href="/" class="btn btn-primary">Start New Session</a>
+  </div>
+</div>
+
+<!-- Summary Metrics Grid -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-val" style="color: #fff;">{{ total_claims }}</div>
+    <div class="stat-label">Total Claims</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--success-text);">{{ verified_count }}</div>
+    <div class="stat-label">Verified Robust (Score 3-4)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--warning-text);">{{ partial_count }}</div>
+    <div class="stat-label">Partial / Fragile (Score 1-2)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-val" style="color: var(--danger-text);">{{ unverified_count }}</div>
+    <div class="stat-label">Unverified / Traps (Score 0)</div>
+  </div>
+</div>
+
+<!-- Defensibility Report Card -->
+<div class="card" style="margin-bottom: 2rem; background: linear-gradient(180deg, rgba(24, 24, 27, 0.9) 0%, rgba(18, 18, 21, 0.9) 100%);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="margin: 0; font-size: 1.15rem;">Defensibility Index</h2>
+    <span class="badge {% if defensibility_pct >= 70 %}badge-success{% elif defensibility_pct >= 40 %}badge-warning{% else %}badge-danger{% endif %}">
+      {{ defensibility_pct }}% Defensible
+    </span>
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+    The defensibility index represents the share of confirmed technical claims supported by verifiable architectural evidence quotes and deterministic rubric satisfaction.
+  </p>
+  <div style="background: #27272a; border-radius: var(--radius-sm); height: 8px; width: 100%; overflow: hidden;">
+    <div style="background: {% if defensibility_pct >= 70 %}var(--success-text){% elif defensibility_pct >= 40 %}var(--warning-text){% else %}var(--danger-text){% endif %}; height: 100%; width: {{ defensibility_pct }}%;"></div>
+  </div>
+</div>
+
+<!-- Mastery Matrix Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border);">
+    <h2 style="margin: 0; font-size: 1.1rem;">Claim Verification Matrix</h2>
+  </div>
+
+  <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 140px;">Domain / Project</th>
+          <th>Claim Text</th>
+          <th style="width: 140px;">Score (0-4)</th>
+          <th style="width: 160px;">Defensibility State</th>
+          <th style="width: 200px;">Evidence & Audit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in matrix_rows %}
+        <tr>
+          <td>
+            <span class="badge badge-neutral">{{ row.claim.claim_type.value }}</span>
+            {% if row.claim.project_id %}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{{ row.claim.project_id }}</code></div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="color: #fff; font-weight: 500;">{{ row.claim.text }}</div>
+            {% if row.claim.metric_values %}
+            <div style="display: flex; gap: 0.35rem; margin-top: 0.35rem;">
+              {% for m in row.claim.metric_values %}
+              <span class="badge badge-warning" style="font-size: 0.7rem;">{{ m }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #fff;">
+              {{ row.score }} <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">/ 4</span>
+            </div>
+            <div style="background: #27272a; border-radius: 2px; height: 4px; width: 60px; margin-top: 0.35rem; overflow: hidden;">
+              <div style="background: {% if row.score >= 3 %}var(--success-text){% elif row.score >= 1 %}var(--warning-text){% else %}var(--danger-text){% endif %}; height: 100%; width: {{ (row.score / 4 * 100)|int }}%;"></div>
+            </div>
+          </td>
+          <td>
+            {% if row.score >= 3 %}
+            <span class="badge badge-success">Verified Defensible</span>
+            {% elif row.score >= 2 %}
+            <span class="badge badge-warning">Partial Defense</span>
+            {% elif row.score == 1 %}
+            <span class="badge badge-warning">Surface Knowledge</span>
+            {% else %}
+            <span class="badge badge-danger">Unverified / Trap</span>
+            {% endif %}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+              {{ row.answers_count }} attempt(s)
+            </div>
+          </td>
+          <td>
+            {% if row.last_quote %}
+            <div style="font-size: 0.8rem; color: #34d399; font-style: italic;">
+              "{{ row.last_quote[:90] }}{% if row.last_quote|length > 90 %}...{% endif %}"
+            </div>
+            {% else %}
+            <span style="font-size: 0.8rem; color: var(--text-muted);">No verified quote on record</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

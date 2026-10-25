@@ -1,0 +1,137 @@
+{
+  "persona_id": "alex_rivera",
+  "expected_claims": [
+    {
+      "text": "Designed distributed replication topology across 3 geographic zones.",
+      "claim_type": "project_metric",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Implemented low-latency write ahead logs with disk sync.",
+      "claim_type": "experience_claim",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Implemented Raft consensus protocol with leader election timeouts of 150-300ms maintaining 99.99% linearizability.",
+      "claim_type": "project_metric",
+      "project_id": "raft-kv",
+      "is_trap": false
+    },
+    {
+      "text": "Sustained 45,000 req/sec write throughput under 3-node cluster benchmark.",
+      "claim_type": "project_metric",
+      "project_id": "raft-kv",
+      "is_trap": false
+    },
+    {
+      "text": "Handled 100,000 req/sec write throughput with zero packet loss under split-brain network partition.",
+      "claim_type": "project_metric",
+      "project_id": "raft-kv",
+      "is_trap": true
+    },
+    {
+      "text": "Built Paxos consensus engine and migrated infrastructure to Kubernetes with Istio service mesh.",
+      "claim_type": "project_metric",
+      "project_id": "raft-kv",
+      "is_trap": true
+    },
+    {
+      "text": "Engineered crash-resilient write-ahead logger with p99 fsync latency of 1.13ms using O_DIRECT on NVMe.",
+      "claim_type": "project_metric",
+      "project_id": "wal-engine",
+      "is_trap": false
+    },
+    {
+      "text": "Achieved zero byte corruption across 500 simulated sudden kernel panic injection cycles.",
+      "claim_type": "project_metric",
+      "project_id": "wal-engine",
+      "is_trap": false
+    },
+    {
+      "text": "Distributed sliding-window token bucket limiter processing 80,000 req/sec at sub-millisecond p99 latency.",
+      "claim_type": "project_metric",
+      "project_id": "flow-limiter",
+      "is_trap": false
+    },
+    {
+      "text": "Go",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "C++",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Python",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "SQL",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Raft",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "gRPC",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Redis",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "POSIX I/O",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Consensus protocols",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Docker",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Git",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Linux",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Prometheus",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    }
+  ]
+}

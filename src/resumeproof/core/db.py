@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS rubrics (
     source_line INTEGER NOT NULL,
     source_quote TEXT NOT NULL,
     criteria TEXT NOT NULL, -- JSON dict of 0-4 scoring anchors
+    atomic_points TEXT DEFAULT '[]', -- JSON array of AtomicPoint objects
     created_at TEXT NOT NULL
 );
 

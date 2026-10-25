@@ -1,0 +1,131 @@
+{
+  "persona_id": "sam_okafor",
+  "expected_claims": [
+    {
+      "text": "Built RESTful API with SQLite connection pooling sustaining 350 concurrent read req/sec.",
+      "claim_type": "project_metric",
+      "project_id": "task-tracker-api",
+      "is_trap": false
+    },
+    {
+      "text": "Implemented JWT authentication and role-based access control.",
+      "claim_type": "experience_claim",
+      "project_id": "task-tracker-api",
+      "is_trap": false
+    },
+    {
+      "text": "Built enterprise microservices architecture supporting millions of global enterprise users.",
+      "claim_type": "project_metric",
+      "project_id": "task-tracker-api",
+      "is_trap": true
+    },
+    {
+      "text": "Implemented recursive UDP DNS resolver resolving queries in under 45ms for cached records.",
+      "claim_type": "project_metric",
+      "project_id": "mini-dns-resolver",
+      "is_trap": false
+    },
+    {
+      "text": "Parsed RFC 1035 wire format A and CNAME record headers.",
+      "claim_type": "project_metric",
+      "project_id": "mini-dns-resolver",
+      "is_trap": false
+    },
+    {
+      "text": "Prevented enterprise-level DDoS attacks using automated BGP route scrubbing.",
+      "claim_type": "project_metric",
+      "project_id": "mini-dns-resolver",
+      "is_trap": true
+    },
+    {
+      "text": "Captured and decoded IPv4, TCP, and UDP packet headers with custom bitwise unpacking.",
+      "claim_type": "project_metric",
+      "project_id": "packet-sniffer",
+      "is_trap": false
+    },
+    {
+      "text": "Architected Apache Kafka event bus for financial transaction settlement.",
+      "claim_type": "project_metric",
+      "project_id": "packet-sniffer",
+      "is_trap": true
+    },
+    {
+      "text": "Designed distributed Raft consensus cluster with Byzantine fault tolerance.",
+      "claim_type": "project_metric",
+      "project_id": "packet-sniffer",
+      "is_trap": true
+    },
+    {
+      "text": "Python",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "SQL",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "FastAPI",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "SQLite",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Sockets",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "TCP/IP",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "UDP",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "HTTP",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "DNS",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Git",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Linux",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    },
+    {
+      "text": "Docker",
+      "claim_type": "skill",
+      "project_id": null,
+      "is_trap": false
+    }
+  ]
+}

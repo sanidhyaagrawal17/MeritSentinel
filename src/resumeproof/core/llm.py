@@ -280,7 +280,11 @@ class FakeLLMClient(LLMClient):
             import re
             user_msg = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), msg_str)
             ans_snippet = user_msg.split("Candidate Answer:")[-1].strip().lower() if "Candidate Answer:" in user_msg else user_msg.lower()
+            raw_ans = user_msg.split("Candidate Answer:")[-1].strip() if "Candidate Answer:" in user_msg else user_msg
             rubric_ids = re.findall(r"\[Rubric Item ID:\s*([a-zA-Z0-9\-_]+)\]", user_msg)
+            atomic_point_ids = re.findall(r"\[Atomic Point ID:\s*([a-zA-Z0-9\-_]+)\]", user_msg)
+            if not atomic_point_ids and rubric_ids:
+                atomic_point_ids = [f"{rid}_p0" for rid in rubric_ids]
 
             # Check for trap answers (unsupported claims) or off-topic answers in candidate answer
             if any(t in ans_snippet for t in ["byzantine", "raft cluster", "raft consensus", "bgp scrubbing", "kafka event bus", "paxos engine", "70b lora", "16-gpu"]) or "wrong topic" in ans_snippet:
@@ -289,8 +293,13 @@ class FakeLLMClient(LLMClient):
                     if ("kafka" in ans_snippet or "bgp" in ans_snippet)
                     else "We implemented a distributed Raft consensus cluster"
                 )
+                if ev_quote not in raw_ans:
+                    ev_quote = raw_ans[:80]
+                points = [{"point_id": pid, "matched": False, "evidence_quote": ""} for pid in atomic_point_ids]
                 return {
                     "raw_score": 0,
+                    "points": points,
+                    "point_evaluations": points,
                     "evidence_quote": ev_quote,
                     "rubric_reference": "Verified documentation explicitly disclaims Kafka, Raft consensus, and BGP scrubbing.",
                     "feedback": "Answer discusses an unrelated topic or claims unverified enterprise distributed systems technologies not present in the verified project.",
@@ -298,9 +307,12 @@ class FakeLLMClient(LLMClient):
                     "missed_rubric_ids": rubric_ids,
                 }
             elif any(g in ans_snippet for g in ["standard tutorials", "general tutorials", "error handling and responded quickly", "apis require good database"]):
+                points = [{"point_id": pid, "matched": False, "evidence_quote": ""} for pid in atomic_point_ids]
                 return {
                     "raw_score": 1,
-                    "evidence_quote": "We followed standard tutorials to make sure the app responded quickly.",
+                    "points": points,
+                    "point_evaluations": points,
+                    "evidence_quote": "We followed standard tutorials to make sure the app responded quickly." if "standard tutorials" in raw_ans else raw_ans[:60],
                     "rubric_reference": "Verified documentation specifies SQLite WAL mode and connection pooling benchmarks.",
                     "feedback": "Generic response lacking concrete technical parameters or architectural depth.",
                     "matched_rubric_ids": [],
@@ -308,32 +320,55 @@ class FakeLLMClient(LLMClient):
                 }
             elif any(t in ans_snippet for t in ["terse", "sqlalchemy connection pool of 10"]):
                 if "locust" not in ans_snippet and "checkpointing" not in ans_snippet:
+                    half = max(1, len(atomic_point_ids) // 2)
+                    quote_part = "WAL mode" if "wal mode" in ans_snippet else raw_ans[:30]
+                    points = [
+                        {"point_id": pid, "matched": idx < half, "evidence_quote": quote_part if idx < half else ""}
+                        for idx, pid in enumerate(atomic_point_ids)
+                    ]
                     return {
                         "raw_score": 2,
-                        "evidence_quote": "Enabled WAL mode and SQLAlchemy connection pool of 10 to hit 350 req/sec.",
+                        "points": points,
+                        "point_evaluations": points,
+                        "evidence_quote": quote_part,
                         "rubric_reference": "README.md: Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.",
-                        "feedback": "Accurate parameters provided but lacks architectural depth on concurrency trade-offs.",
+                        "feedback": "Accurate parameters provided matching partial atomic points.",
                         "matched_rubric_ids": rubric_ids[:1],
                         "missed_rubric_ids": rubric_ids[1:],
                     }
             elif any(s in ans_snippet for s in ["locust test", "checkpointing", "write-ahead logging", "single-node", "350 read req/sec"]):
+                quote_part = "tuned SQLAlchemy connection pooling to 10 connections" if "10 connections" in raw_ans else raw_ans[:50]
+                points = [
+                    {"point_id": pid, "matched": True, "evidence_quote": quote_part}
+                    for pid in atomic_point_ids
+                ]
                 return {
                     "raw_score": 4,
-                    "evidence_quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
+                    "points": points,
+                    "point_evaluations": points,
+                    "evidence_quote": quote_part,
                     "rubric_reference": "README.md: Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.",
-                    "feedback": "Exemplary architectural understanding articulating WAL checkpointing, single-writer multi-reader trade-offs, and verified locust benchmark numbers.",
+                    "feedback": "Candidate accurately articulated all verified atomic points including pool sizing and benchmarks.",
                     "matched_rubric_ids": rubric_ids,
                     "missed_rubric_ids": [],
                 }
             # Default competent rating
+            quote_part = raw_ans[:40] if raw_ans else "verified facts"
+            points = [
+                {"point_id": pid, "matched": True, "evidence_quote": quote_part}
+                for pid in atomic_point_ids
+            ]
             return {
                 "raw_score": 3,
-                "evidence_quote": "Candidate answered with accurate technical specifics.",
+                "points": points,
+                "point_evaluations": points,
+                "evidence_quote": quote_part,
                 "rubric_reference": "Project verified documentation.",
-                "feedback": "Competent technical response matching ground truth.",
+                "feedback": "Competent technical response matching ground truth atomic points.",
                 "matched_rubric_ids": rubric_ids,
                 "missed_rubric_ids": [],
             }
+
 
         # Automatic detection of demo personas in resume text
         from resumeproof.fixtures.demo_fixtures import DEMO_FIXTURES

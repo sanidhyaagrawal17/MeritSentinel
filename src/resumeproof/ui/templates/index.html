@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}ResumeProof | Home & Persona Selection{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2.5rem;">
+  <h1>Adversarial Technical Verification</h1>
+  <p class="subtitle">Extract verifiable claims, generate rubric-grounded technical questions, and audit engineering competency under strict evidence standards.</p>
+</div>
+
+<div class="grid-2">
+  <!-- Demo Personas -->
+  <div class="card">
+    <h2>1. Select Demo Persona</h2>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.25rem;">
+      Test the end-to-end pipeline with pre-configured personas containing real project documentation and planted verification traps.
+    </p>
+
+    <form action="/upload" method="POST" class="form-group">
+      <input type="hidden" name="user_id" value="demo_user">
+      
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+          <input type="radio" name="persona" value="sam_okafor" checked style="margin-top: 0.25rem;">
+          <div>
+            <div style="font-weight: 600; color: #fff;">Sam Okafor</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Backend SWE • Task-Tracker API, SQLite WAL Mode, Locust Load Testing</div>
+          </div>
+        </label>
+
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+          <input type="radio" name="persona" value="alex_rivera" style="margin-top: 0.25rem;">
+          <div>
+            <div style="font-weight: 600; color: #fff;">Alex Rivera</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Full-Stack & Cloud • Multi-tenant SaaS, Postgres Partitioning, Redis Caching</div>
+          </div>
+        </label>
+
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+          <input type="radio" name="persona" value="priya_nair" style="margin-top: 0.25rem;">
+          <div>
+            <div style="font-weight: 600; color: #fff;">Priya Nair</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">MLOps & Data • Vector Search Pipeline, FAISS, Streaming Ingestion</div>
+          </div>
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Load Demo Persona & Extract Claims</button>
+    </form>
+  </div>
+
+  <!-- Custom Resume Upload -->
+  <div class="card">
+    <h2>2. Upload Custom Resume</h2>
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.25rem;">
+      Upload a PDF or Markdown resume file to parse profile facts and structured technical claims.
+    </p>
+
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="custom_user_id">User Identifier</label>
+        <input type="text" id="custom_user_id" name="user_id" value="candidate_1" required>
+      </div>
+
+      <div class="form-group">
+        <label for="resume_file">Resume File (.pdf or .md)</label>
+        <input type="file" id="resume_file" name="file" accept=".pdf,.md" required>
+      </div>
+
+      <button type="submit" class="btn btn-secondary" style="width: 100%; margin-top: 1rem;">Upload & Run Extraction</button>
+    </form>
+
+    <div style="margin-top: 2rem; padding: 1rem; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--surface-border); border-radius: var(--radius-sm);">
+      <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem;">Pipeline Invariant</div>
+      <p style="font-size: 0.82rem; color: #d4d4d8;">
+        Deterministic scoring (0–4) requires verbatim evidence quotes in the candidate's answers matching verified project documentation rubrics.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

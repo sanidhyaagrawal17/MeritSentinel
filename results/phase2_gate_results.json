@@ -1,260 +1,397 @@
 {
-  "item2_rubric_questions": {
-    "passed": 10,
+  "metadata": {
+    "date": "2026-10-25T08:30:13.844368+00:00",
+    "interviewer_model": "qwen2.5:3b",
+    "interviewer_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "grader_model": "qwen2.5:7b",
+    "grader_digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "data_source": "Live local Ollama inference against data/demo"
+  },
+  "item2_task_tracker_bug_fix": {
+    "score": 4,
+    "evidence_quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test; enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections; reaching 350 read req/sec in our locust test",
+    "feedback": "All verified atomic rubric points satisfied. Evidence: Point 'Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.' verified by \"enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test\"; Point 'Uses SQLite WAL mode with SQLAlchemy async engine and pool_size=10.' verified by \"enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections\"; Point 'Verified metrics: concurrent_read_req_sec=350, db=SQLite' verified by \"reaching 350 read req/sec in our locust test\".",
+    "credited_10_connections": true,
+    "demands_tradeoffs": false,
+    "latency_ms": 30894.28870001575,
+    "point_evaluations": {
+      "7e4550f0-c840-46fa-9491-a6e06f52907e": {
+        "matched": true,
+        "evidence_quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test"
+      },
+      "14b6737b-13dc-4cc5-9010-b5c5a4ae0d00": {
+        "matched": true,
+        "evidence_quote": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections"
+      },
+      "f3f8a1a5-927a-499e-ab11-00b6fbdddc29": {
+        "matched": true,
+        "evidence_quote": "reaching 350 read req/sec in our locust test"
+      }
+    },
+    "model": "qwen2.5:7b",
+    "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "date": "2026-10-25T08:30:13.844368+00:00",
+    "data_source": "data/demo/sam_okafor/projects/task-tracker-api"
+  },
+  "item3_rubric_questions": {
+    "overlap_pass_count": 10,
+    "outside_points_count": 0,
     "total": 10,
+    "mean_latency_ms": 4699.150530001498,
     "details": [
       {
         "idx": 1,
         "project_id": "mini-dns-resolver",
         "topic": "mini_dns_resolver_a_recursive_dns",
         "source_quote": "A recursive DNS query resolver built with Python raw sockets.",
-        "question": "How did you handle DNS query timeouts in your recursive DNS resolver built with Python raw sockets? What mechanisms did you implement to ensure reliable query responses?",
-        "overlap_tokens": [
-          "dns",
-          "python",
-          "query",
-          "raw",
-          "recursive",
-          "resolver"
+        "atomic_points": [
+          "A recursive DNS query resolver built with Python raw sockets.",
+          "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
+          "Verified metrics: cached_resolution_ms=45, records_supported=['A', 'CNAME']"
         ],
-        "passed": true,
-        "latency_ms": 3826.8029000028037
+        "question": "How did you implement the in-memory dict cache with TTL expiration as specified in Point 2 of your atomic rubric?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 12385.384400025941,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 2,
         "project_id": "mini-dns-resolver",
         "topic": "resolves_cached_dns",
         "source_quote": "- Resolves cached DNS queries in under 45ms.",
-        "question": "How did you optimize the mini-dns-resolver to ensure that cached DNS queries are resolved within 45 milliseconds, and what specific mechanisms did you implement to achieve this performance?",
-        "overlap_tokens": [
-          "cached",
-          "dns",
-          "queries"
+        "atomic_points": [
+          "Resolves cached DNS queries in under 45ms.",
+          "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
+          "Verified metrics: cached_resolution_ms=45, records_supported=['A', 'CNAME']"
         ],
-        "passed": true,
-        "latency_ms": 3469.241899991175
+        "question": "How did you verify that cached DNS queries were resolved in under 45ms using the in-memory dict cache with TTL expiration?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3700.5078999791294,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 3,
         "project_id": "mini-dns-resolver",
         "topic": "parses_a_and",
         "source_quote": "- Parses A and CNAME records per RFC 1035.",
-        "question": "How did you ensure your implementation correctly handles edge cases such as DNS loops when parsing A and CNAME records according to RFC 1035?",
-        "overlap_tokens": [
-          "cname",
-          "records",
-          "rfc"
+        "atomic_points": [
+          "Parses A and CNAME records per RFC 1035.",
+          "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
+          "Verified metrics: cached_resolution_ms=45, records_supported=['A', 'CNAME']"
         ],
-        "passed": true,
-        "latency_ms": 3555.5430999957025
+        "question": "How did you verify that your system supports A and CNAME records as specified in the records_supported parameter?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3816.7970000067726,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 4,
         "project_id": "mini-dns-resolver",
         "topic": "local_toy_project",
         "source_quote": "- Local toy project; no BGP scrubbing or enterprise DDoS protection.",
-        "question": "How did you ensure the local toy project adhered to the constraints of no BGP scrubbing or enterprise DDoS protection, and what specific technical measures did you implement to manage these limitations?",
-        "overlap_tokens": [
-          "bgp",
-          "ddos",
-          "enterprise",
-          "local",
-          "project",
-          "scrubbing",
-          "toy"
+        "atomic_points": [
+          "Local toy project; no BGP scrubbing or enterprise DDoS protection.",
+          "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
+          "Verified metrics: cached_resolution_ms=45, records_supported=['A', 'CNAME']"
         ],
-        "passed": true,
-        "latency_ms": 3560.799999977462
+        "question": "How did you verify the `cached_resolution_ms` metric of 45 in your local toy project, and what mechanisms did you use to ensure its accuracy?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3920.7473999995273,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 5,
         "project_id": "mini-dns-resolver",
         "topic": "overview_uses_python_struct",
         "source_quote": "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration.",
-        "question": "How did you handle the scenario where the UDP payload size exceeded the in-memory dict cache capacity, and what mechanism did you implement to ensure TTL expiration for cache entries?",
-        "overlap_tokens": [
-          "cache",
-          "dict",
-          "in-memory",
-          "ttl",
-          "udp"
+        "atomic_points": [
+          "Uses Python struct module for unpacking UDP payloads. In-memory dict cache with TTL expiration."
         ],
-        "passed": true,
-        "latency_ms": 3726.2539000075776
+        "question": "How do you ensure that the TTL expiration for the in-memory dict cache is correctly implemented and does not exceed the expected UDP payload TTL?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3286.1134999839123,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 6,
         "project_id": "packet-sniffer",
         "topic": "packet_sniffer_python_packet_capture",
         "source_quote": "Python packet capture tool using AF_INET raw sockets.",
-        "question": "How did you handle packet filtering in your Python packet capture tool to ensure it only captured traffic using AF_INET raw sockets?",
-        "overlap_tokens": [
-          "af_inet",
-          "capture",
-          "packet",
-          "python",
-          "raw",
-          "tool"
+        "atomic_points": [
+          "Python packet capture tool using AF_INET raw sockets.",
+          "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.",
+          "Verified metrics: protocols=['IPv4', 'TCP', 'UDP']"
         ],
-        "passed": true,
-        "latency_ms": 3481.7481999925803
+        "question": "How did you implement the extraction of IP version, IHL, TTL, and source/dest IPs using bit shift operations as specified in Point 2?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3869.715400011046,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 7,
         "project_id": "packet-sniffer",
         "topic": "verified_features_unpacks_20_byte",
         "source_quote": "- Unpacks 20-byte IPv4 headers and extracts protocol (TCP/UDP/ICMP).",
-        "question": "How did you handle the unpacking of the 20-byte IPv4 header to distinguish between TCP, UDP, and ICMP protocols in your implementation? What mechanisms did you use to ensure accurate protocol detection?",
-        "overlap_tokens": [
-          "20-byte",
-          "icmp",
-          "ipv4",
-          "protocol",
-          "tcp",
-          "udp"
+        "atomic_points": [
+          "Unpacks 20-byte IPv4 headers and extracts protocol (TCP/UDP/ICMP).",
+          "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.",
+          "Verified metrics: protocols=['IPv4', 'TCP', 'UDP']"
         ],
-        "passed": true,
-        "latency_ms": 3982.672799989814
+        "question": "How did you extract the protocol (TCP/UDP/ICMP) information from the 20-byte IPv4 headers using bit shift operations as specified in Point 2 of the atomic rubric?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 4429.793799994513,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 8,
         "project_id": "packet-sniffer",
         "topic": "verified_features_educational_script_no",
         "source_quote": "- Educational script; no Kafka or Raft consensus.",
-        "question": "How did you ensure the educational script adhered strictly to the absence of Kafka and Raft consensus mechanisms, and what specific design decisions did you make to implement this constraint?",
-        "overlap_tokens": [
-          "educational",
-          "kafka",
-          "raft",
-          "script"
+        "atomic_points": [
+          "Educational script; no Kafka or Raft consensus.",
+          "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.",
+          "Verified metrics: protocols=['IPv4', 'TCP', 'UDP']"
         ],
-        "passed": true,
-        "latency_ms": 3766.061999980593
+        "question": "How did you extract the IP version, IHL, TTL, and source/destination IPs using bit shift operations as specified in Atomic Point 2?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 4296.852300001774,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 9,
         "project_id": "packet-sniffer",
         "topic": "overview_extracts_ip_version",
         "source_quote": "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations.",
-        "question": "How did you determine the bit positions for extracting the IP version, IHL, TTL, and source/dest IPs using bit shift operations, and what constraints did you consider in your implementation?",
-        "overlap_tokens": [
-          "bit",
-          "dest",
-          "ihl",
-          "ips",
-          "shift",
-          "source",
-          "ttl",
-          "version"
+        "atomic_points": [
+          "Extracts IP version, IHL, TTL, and source/dest IPs using bit shift operations."
         ],
-        "passed": true,
-        "latency_ms": 3947.7307999914046
+        "question": "How do you extract the IP version, Internet Header Length (IHL), Time to Live (TTL), and source/destination IP addresses using bit shift operations in your implementation?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3642.3498000076506,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       },
       {
         "idx": 10,
         "project_id": "task-tracker-api",
         "topic": "task_tracker_api_fastapi_task_management",
         "source_quote": "FastAPI task management backend using SQLite.",
-        "question": "How did you ensure database transactions in your FastAPI task management backend used SQLite were atomic, consistent, isolated, and durable (ACID properties)?",
-        "overlap_tokens": [
-          "backend",
-          "fastapi",
-          "management",
-          "task"
+        "atomic_points": [
+          "FastAPI task management backend using SQLite.",
+          "Uses SQLite WAL mode with SQLAlchemy async engine and pool_size=10.",
+          "Verified metrics: concurrent_read_req_sec=350, db=SQLite"
         ],
-        "passed": true,
-        "latency_ms": 3685.214299999643
+        "question": "How did you configure the SQLAlchemy async engine to use SQLite in WAL mode and what is the pool size you set for it?",
+        "overlap_passed": true,
+        "is_outside": false,
+        "latency_ms": 3643.2438000047114,
+        "model": "qwen2.5:3b",
+        "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
       }
-    ]
-  },
-  "item3_grader_cases": {
-    "(a) Confident wrong topic": {
-      "score": 0,
-      "evidence_quote": "We built an Apache Kafka event bus and BGP scrubbing centers to stream financial transactions into our Byzantine fault-tolerant Raft cluster with zero downtime.",
-      "matched_rubrics": [],
-      "missed_rubrics": [
-        "rubric_wal_anchor"
-      ],
-      "critique": "The candidate's answer discusses an unrelated topic, focusing on Kafka, Raft, and BGP, which are not relevant to the Task-Tracker API project as described in the rubric. The answer does not mention SQLite, WAL mode, or connection pooling, which are the key elements required by the rubric.",
-      "latency_ms": 24450.88330001454
-    },
-    "(b) Correct but terse": {
-      "score": 3,
-      "evidence_quote": "Enabled WAL mode and SQLAlchemy connection pool of 10 to hit 350 req/sec.",
-      "matched_rubrics": [
-        "rubric_wal_anchor"
-      ],
-      "missed_rubrics": [],
-      "critique": "The candidate's answer is competent and matches the verified ground truth. However, it does not provide the exact number of connections in the connection pool, which is a key parameter mentioned in the rubric. The answer is accurate but could be more precise.",
-      "latency_ms": 12122.265399986645
-    },
-    "(c) Copy-pasted generic": {
-      "score": 1,
-      "evidence_quote": "APIs require good database connections and error handling. We followed standard tutorials to make sure the app responded quickly.",
-      "matched_rubrics": [],
-      "missed_rubrics": [
-        "rubric_wal_anchor"
-      ],
-      "critique": "The candidate's answer is generic and does not provide concrete details matching the verified ground truth. The answer does not mention SQLite WAL mode or connection pooling, which are critical components for sustaining 350 concurrent read req/sec as per the project rubric.",
-      "latency_ms": 13741.418200021144
-    },
-    "(d) Strong answer": {
-      "score": 3,
-      "evidence_quote": "In Task-Tracker API, SQLite can become a write bottleneck, so we enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
-      "matched_rubrics": [
-        "rubric_wal_anchor"
-      ],
-      "missed_rubrics": [],
-      "critique": "The candidate's answer is competent and matches the verified ground truth. The answer correctly mentions enabling WAL mode and tuning connection pooling, which are key aspects of the project. However, the answer does not explicitly state the sustained read rate of 350 req/sec, which is a critical detail. The candidate should have directly stated the read rate to fully satisfy the criteria.",
-      "latency_ms": 17848.932799999602
-    }
-  },
-  "item4_task_tracker_anchors": {
-    "score": 3,
-    "evidence_quote": "In Task-Tracker API, SQLite can become a write bottleneck, so we enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test.",
-    "matched_rubrics": [
-      "rubric_wal_anchor"
     ],
-    "missed_rubrics": [],
-    "critique": "The candidate's answer is competent and matches the verified ground truth. The answer correctly mentions enabling WAL mode and tuning connection pooling, which are key aspects of the project. However, the answer does not explicitly state the sustained read rate of 350 req/sec, which is a critical detail. The candidate should have directly stated the read rate to fully satisfy the criteria.",
-    "latency_ms": 17848.932799999602
+    "model": "qwen2.5:3b",
+    "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "date": "2026-10-25T08:30:13.844368+00:00",
+    "data_source": "data/demo/*/projects/*"
   },
-  "item5_extractor_eval": {
+  "item4_grader_discrimination": {
+    "total_items": 5,
+    "ordering_holds_count": 3,
+    "mean_latency_ms": 17535.733914998127,
+    "details": [
+      {
+        "project_id": "task-tracker-api",
+        "topic": "sustained_350_concurrent",
+        "source_quote": "- Sustained 350 concurrent read req/sec with SQLite WAL mode and connection pooling.",
+        "scores": {
+          "strong": 4,
+          "terse": 2,
+          "generic": 0,
+          "wrong_topic": 0
+        },
+        "quotes": {
+          "strong": "enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections. For read-heavy operations, this allowed concurrent reads while WAL checkpointing happened in the background, reaching 350 read req/sec in our locust test; enabled WAL (Write-Ahead Logging) mode and tuned SQLAlchemy connection pooling to 10 connections; reaching 350 read req/sec in our locust test",
+          "terse": "Enabled SQLite WAL mode and set pool_size=10; Enabled SQLite WAL mode and set pool_size=10",
+          "generic": "We configured a standard database pool and ensured good performance with standard error handling.",
+          "wrong_topic": "We used an Apache Kafka event bus and BGP route scrubbing to stream financial transactions into a Byzantine Raft cluster"
+        },
+        "strict_holds": true,
+        "model": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+      },
+      {
+        "project_id": "mini-dns-resolver",
+        "topic": "resolves_cached_dns",
+        "source_quote": "- Resolves cached DNS queries in under 45ms.",
+        "scores": {
+          "strong": 2,
+          "terse": 1,
+          "generic": 0,
+          "wrong_topic": 0
+        },
+        "quotes": {
+          "strong": "resolving cached DNS queries in under 45ms; We used an in-memory dictionary cache with TTL expiration",
+          "terse": "We used an in-memory dict cache with TTL expiration resolving queries in under 45ms",
+          "generic": "We implemented an in-memory caching layer to speed up network query responses.",
+          "wrong_topic": "We tuned LightGBM interaction depth to 6 with FP32 ONNX Runtime graph execution on NVIDIA GPUs."
+        },
+        "strict_holds": true,
+        "model": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+      },
+      {
+        "project_id": "packet-sniffer",
+        "topic": "verified_features_unpacks_20_byte",
+        "source_quote": "- Unpacks 20-byte IPv4 headers and extracts protocol (TCP/UDP/ICMP).",
+        "scores": {
+          "strong": 2,
+          "terse": 1,
+          "generic": 0,
+          "wrong_topic": 0
+        },
+        "quotes": {
+          "strong": "unpacked the 20-byte IPv4 headers, extracting IP version, IHL, TTL, and source/dest IPs using bit shift operations, and verified protocol extraction for IPv4, TCP, and UDP; unpacked the 20-byte IPv4 headers, extracting IP version, IHL, TTL, and source/dest IPs using bit shift operations, and verified protocol extraction for IPv4, TCP, and UDP",
+          "terse": "Unpacked 20-byte IPv4 headers using AF_INET raw sockets to extract TCP and UDP protocol numbers",
+          "generic": "We captured network packets and parsed header information to log network traffic.",
+          "wrong_topic": "We deployed Kubernetes with Istio service mesh and Paxos consensus engines across multi-region clusters."
+        },
+        "strict_holds": true,
+        "model": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+      },
+      {
+        "project_id": "flow-limiter",
+        "topic": "processes_80_000",
+        "source_quote": "- Processes 80,000 req/sec with p99 latency < 0.8ms.",
+        "scores": {
+          "strong": 4,
+          "terse": 0,
+          "generic": 0,
+          "wrong_topic": 0
+        },
+        "quotes": {
+          "strong": "processing 80,000 req/sec with p99 latency under 0.8ms; processing 80,000 req/sec with p99 latency under 0.8ms",
+          "terse": "Processed 80,000 req/sec using Redis rate limiting.",
+          "generic": "We used Redis cache to rate-limit incoming API traffic and reduce latency spikes.",
+          "wrong_topic": "We implemented SQLite WAL checkpointing and tuned async SQLAlchemy pool size to 10 connections."
+        },
+        "strict_holds": false,
+        "model": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+      },
+      {
+        "project_id": "raft-kv",
+        "topic": "max_stable_write",
+        "source_quote": "- Max stable write throughput: 45,000 req/sec.",
+        "scores": {
+          "strong": 2,
+          "terse": 2,
+          "generic": 0,
+          "wrong_topic": 0
+        },
+        "quotes": {
+          "strong": "sustained a maximum stable write throughput of 45,000 req/sec",
+          "terse": "Tested on 3 nodes, sustaining 45,000 req/sec write throughput",
+          "generic": "We benchmarked our key-value cluster under heavy load to measure maximum throughput.",
+          "wrong_topic": "We parsed RFC 1035 wire format A and CNAME record headers using Python UDP sockets."
+        },
+        "strict_holds": false,
+        "model": "qwen2.5:7b",
+        "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+      }
+    ],
+    "model": "qwen2.5:7b",
+    "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "date": "2026-10-25T08:30:13.844368+00:00",
+    "data_source": "5 rubric items x 4 answer tiers"
+  },
+  "item5_latencies": {
+    "mean_question_latency_ms": 4699.150530001498,
+    "mean_grading_latency_ms": 17535.733914998127,
+    "mean_total_turn_latency_ms": 22234.884444999625,
+    "investigation_29470ms": "Measured live Ollama execution latency on qwen2.5:7b structured output for ~300 prompt tokens and ~280 output tokens. Not cached (<50ms) and not a timeout (60s/120s).",
+    "model": "qwen2.5:7b & qwen2.5:3b",
+    "date": "2026-10-25T08:30:13.844368+00:00",
+    "data_source": "resumeproof.db session_turns and live benchmark measurements"
+  },
+  "item6_extractor_eval": {
     "sam_okafor": {
-      "total_facts": 8,
-      "has_employer": false,
-      "has_emp_dates": false,
-      "total_claims": 21,
-      "skill_claims_count": 12,
-      "project_claims_count": 5,
-      "misclassified_count": 0,
-      "key_claims_matched": "6/6",
-      "precision": 1.0,
-      "recall": 1.0
+      "expected_count": 21,
+      "extracted_count": 21,
+      "tp": 21,
+      "fp": 4,
+      "fn": 0,
+      "precision": 0.84,
+      "recall": 1.0,
+      "misclassified_project_claims": 0,
+      "model": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "date": "2026-10-25T08:30:13.844368+00:00",
+      "data_source": "Live extraction from data/demo/sam_okafor/resume.pdf"
     },
     "alex_rivera": {
-      "total_facts": 10,
-      "has_employer": true,
-      "has_emp_dates": true,
-      "total_claims": 22,
-      "skill_claims_count": 13,
-      "project_claims_count": 9,
-      "misclassified_count": 0,
-      "key_claims_matched": "6/6",
-      "precision": 1.0,
-      "recall": 1.0
+      "expected_count": 22,
+      "extracted_count": 22,
+      "tp": 22,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.9565217391304348,
+      "recall": 1.0,
+      "misclassified_project_claims": 0,
+      "model": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "date": "2026-10-25T08:30:13.844368+00:00",
+      "data_source": "Live extraction from data/demo/alex_rivera/resume.pdf"
     },
     "priya_nair": {
-      "total_facts": 10,
-      "has_employer": true,
-      "has_emp_dates": true,
-      "total_claims": 20,
-      "skill_claims_count": 12,
-      "project_claims_count": 7,
-      "misclassified_count": 0,
-      "key_claims_matched": "6/6",
-      "precision": 1.0,
-      "recall": 1.0
+      "expected_count": 20,
+      "extracted_count": 20,
+      "tp": 20,
+      "fp": 3,
+      "fn": 0,
+      "precision": 0.8695652173913043,
+      "recall": 1.0,
+      "misclassified_project_claims": 0,
+      "model": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "date": "2026-10-25T08:30:13.844368+00:00",
+      "data_source": "Live extraction from data/demo/priya_nair/resume.pdf"
     }
+  },
+  "rule_based_vs_llm_breakdown": {
+    "llm_output": [
+      "Initial raw ProfileFact values and fact types from resume lines",
+      "Initial raw Claim texts, claim types, extracted tools, and metrics",
+      "Candidate answer point matching and verbatim evidence quote extraction"
+    ],
+    "rule_based_heuristics": [
+      "Header and section boundary segmentation (_map_resume_lines)",
+      "No-experience section gating (dropping employer and employment dates when no Experience section exists)",
+      "Profile fact normalization and enum coercion (normalize_fact_type)",
+      "Line number association via token overlap against parsed lines",
+      "Project ID mapping to project headings",
+      "Claim type coercion based on section context (preventing project bullets from becoming skills)",
+      "Multi-skill comma and colon splitting in Skills section",
+      "Exact and semantic claim deduplication (_deduplicate_claims)",
+      "Deterministic 0-4 score mapping from matched point share (M/N)",
+      "Deterministic substring check (evidence_quote in answer_text)"
+    ]
   }
 }

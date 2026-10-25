@@ -103,6 +103,7 @@ class InterviewEngine:
 
         prev_q = self.last_questions.get(session_id)
 
+        t_q_start = time.perf_counter()
         question = self.generator.generate_question(
             claim=claim,
             priority=priority,
@@ -112,6 +113,7 @@ class InterviewEngine:
             previous_question=prev_q,
             previous_answer=last_ans,
         )
+        question.latency_ms = (time.perf_counter() - t_q_start) * 1000.0
 
         self.last_questions[session_id] = question.question_text
         return question
@@ -154,7 +156,29 @@ class InterviewEngine:
         if not rubric:
             rubric = self.rubric_store.find_best_rubric_for_claim(claim_obj, persona_id=session.persona_id)
 
+        q_latency = getattr(question, "latency_ms", 0.0)
+
+        turn = InterviewTurn(
+            id=turn_id,
+            session_id=session_id,
+            turn_index=turn_index,
+            claim_id=question.claim_id,
+            question=question,
+            answer=cand_answer,
+            grade=None,
+            question_latency_ms=q_latency,
+            grading_latency_ms=0.0,
+            turn_latency_ms=0.0,
+        )
+
+        session.turns.append(turn)
+        session.total_questions = len(session.turns)
+        self.session_store.record_turn(turn)
+        self.session_store.update_session(session)
+
         def _on_grade_complete(grade: GradeResult) -> None:
+            turn.grade = grade
+            turn.grading_latency_ms = grade.latency_ms
             self.session_store.update_turn_grade_and_mastery(
                 turn_id=turn_id,
                 session_id=session_id,
@@ -183,25 +207,12 @@ class InterviewEngine:
         grade: Optional[GradeResult] = None
         if wait_for_grade:
             grade = future.result(timeout=120.0)
+            turn.grade = grade
+            turn.grading_latency_ms = grade.latency_ms
             self.last_scores[session_id] = grade.raw_score
 
-        latency_ms = (time.perf_counter() - t_start) * 1000.0
-
-        turn = InterviewTurn(
-            id=turn_id,
-            session_id=session_id,
-            turn_index=turn_index,
-            claim_id=question.claim_id,
-            question=question,
-            answer=cand_answer,
-            grade=grade,
-            turn_latency_ms=latency_ms,
-        )
-
-        session.turns.append(turn)
-        session.total_questions = len(session.turns)
-        self.session_store.record_turn(turn)
-        self.session_store.update_session(session)
+        elapsed_turn_ms = (time.perf_counter() - t_start) * 1000.0
+        turn.turn_latency_ms = elapsed_turn_ms
 
         self.last_answers[session_id] = answer_text
 
