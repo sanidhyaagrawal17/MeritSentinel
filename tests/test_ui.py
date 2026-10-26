@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from resumeproof.core.db import Database
 from resumeproof.core.llm import FakeLLMClient
+from tests.fixtures.demo_fixtures import DEMO_FIXTURES
 from resumeproof.ui.app import app, init_app_services
 from resumeproof.schemas.claims import ClaimStatus
 
@@ -14,7 +15,7 @@ def test_client(tmp_path: Path):
     """Initializes TestClient with isolated test database and FakeLLMClient."""
     db_file = tmp_path / "test_ui.db"
     db = Database(str(db_file))
-    llm = FakeLLMClient()
+    llm = FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)
 
     # Re-initialize services with isolated db and fake LLM
     app.state.services = init_app_services(database=db, llm=llm)

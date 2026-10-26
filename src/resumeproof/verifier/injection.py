@@ -132,9 +132,12 @@ class AdversarialDetector:
 
     def inspect(self, text: str) -> tuple[bool, list[str]]:
         """Inspects text for adversarial injections and returns (is_adversarial, detected_reasons)."""
-        clean_text = normalize_unicode_homoglyphs(text)
         reasons = []
+        found_homoglyphs = [c for c in text if c in HOMOGLYPH_MAP]
+        if found_homoglyphs:
+            reasons.append(f"Adversarial evasion attempt: text contains {len(found_homoglyphs)} suspicious Unicode homoglyph lookalikes.")
 
+        clean_text = normalize_unicode_homoglyphs(text)
         for reg in self.injection_regexes:
             m = reg.search(clean_text)
             if m:

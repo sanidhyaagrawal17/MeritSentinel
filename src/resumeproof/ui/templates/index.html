@@ -16,11 +16,11 @@
       Test the end-to-end pipeline with pre-configured personas containing real project documentation and planted verification traps.
     </p>
 
-    <form action="/upload" method="POST" class="form-group">
+    <form id="demo-form" action="/upload" method="POST" class="form-group" onsubmit="showExtractionLoader(this, 'Loading Demo Persona...')">
       <input type="hidden" name="user_id" value="demo_user">
       
       <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
-        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem; transition: border-color 0.15s ease;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--surface-border)'">
           <input type="radio" name="persona" value="sam_okafor" checked style="margin-top: 0.25rem;">
           <div>
             <div style="font-weight: 600; color: #fff;">Sam Okafor</div>
@@ -28,7 +28,7 @@
           </div>
         </label>
 
-        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem; transition: border-color 0.15s ease;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--surface-border)'">
           <input type="radio" name="persona" value="alex_rivera" style="margin-top: 0.25rem;">
           <div>
             <div style="font-weight: 600; color: #fff;">Alex Rivera</div>
@@ -36,7 +36,7 @@
           </div>
         </label>
 
-        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem;">
+        <label style="border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; cursor: pointer; display: flex; align-items: flex-start; gap: 0.75rem; transition: border-color 0.15s ease;" onmouseover="this.style.borderColor='var(--accent-color)'" onmouseout="if(!this.querySelector('input').checked) this.style.borderColor='var(--surface-border)'">
           <input type="radio" name="persona" value="priya_nair" style="margin-top: 0.25rem;">
           <div>
             <div style="font-weight: 600; color: #fff;">Priya Nair</div>
@@ -45,7 +45,9 @@
         </label>
       </div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%;">Load Demo Persona & Extract Claims</button>
+      <button id="btn-demo-submit" type="submit" class="btn btn-primary" style="width: 100%;">
+        Load Demo Persona & Extract Claims
+      </button>
     </form>
   </div>
 
@@ -56,26 +58,118 @@
       Upload a PDF or Markdown resume file to parse profile facts and structured technical claims.
     </p>
 
-    <form action="/upload" method="POST" enctype="multipart/form-data">
+    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data" onsubmit="showExtractionLoader(this, 'Analyzing Resume Document...')">
       <div class="form-group">
         <label for="custom_user_id">User Identifier</label>
         <input type="text" id="custom_user_id" name="user_id" value="candidate_1" required>
       </div>
 
       <div class="form-group">
-        <label for="resume_file">Resume File (.pdf or .md)</label>
-        <input type="file" id="resume_file" name="file" accept=".pdf,.md" required>
+        <label>Resume File (.pdf or .md)</label>
+        <div id="dropzone" class="dropzone" onclick="document.getElementById('resume_file').click()">
+          <input type="file" id="resume_file" name="file" accept=".pdf,.md" required onchange="handleFileSelect(this)">
+          <div class="dropzone-icon">📄</div>
+          <div class="dropzone-text" id="dropzone-prompt">Drag & drop resume file here, or browse</div>
+          <div class="dropzone-hint">PDF or Markdown files up to 5 MB</div>
+          <div id="file-badge" class="file-selected-badge" style="display: none;">
+            <span id="file-badge-name">resume.pdf</span>
+            <span id="file-badge-size" style="opacity: 0.75; font-size: 0.75rem;">(64 KB)</span>
+          </div>
+        </div>
       </div>
 
-      <button type="submit" class="btn btn-secondary" style="width: 100%; margin-top: 1rem;">Upload & Run Extraction</button>
+      <button id="btn-upload-submit" type="submit" class="btn btn-secondary" style="width: 100%; margin-top: 1rem;">
+        Upload & Run Extraction
+      </button>
     </form>
 
-    <div style="margin-top: 2rem; padding: 1rem; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--surface-border); border-radius: var(--radius-sm);">
-      <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem;">Pipeline Invariant</div>
-      <p style="font-size: 0.82rem; color: #d4d4d8;">
+    <div style="margin-top: 1.5rem; padding: 0.85rem 1rem; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--surface-border); border-radius: var(--radius-sm);">
+      <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">Pipeline Invariant</div>
+      <p style="font-size: 0.8rem; color: #a1a1aa; line-height: 1.4;">
         Deterministic scoring (0–4) requires verbatim evidence quotes in the candidate's answers matching verified project documentation rubrics.
       </p>
     </div>
   </div>
 </div>
+
+<!-- Fullscreen Extraction Loading Overlay -->
+<div id="extraction-overlay" class="extraction-overlay">
+  <div class="extraction-card">
+    <div class="loader-spinner"></div>
+    <div class="extraction-title" id="loader-title">Extracting Verifiable Claims</div>
+    <div class="extraction-subtitle" id="loader-subtitle">Parsing resume layout, profile facts, tools, and project metrics...</div>
+    
+    <div class="progress-bar-container">
+      <div class="progress-bar-indeterminate"></div>
+    </div>
+    <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+      Deterministic rule parsing and local model analysis in progress. Please wait...
+    </div>
+  </div>
+</div>
+
+<script>
+  function handleFileSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const promptEl = document.getElementById('dropzone-prompt');
+    const badgeEl = document.getElementById('file-badge');
+    const nameEl = document.getElementById('file-badge-name');
+    const sizeEl = document.getElementById('file-badge-size');
+
+    nameEl.textContent = file.name;
+    const sizeKB = (file.size / 1024).toFixed(1);
+    sizeEl.textContent = `(${sizeKB} KB)`;
+
+    promptEl.style.display = 'none';
+    badgeEl.style.display = 'inline-flex';
+  }
+
+  // Setup drag-and-drop feedback
+  const dropzone = document.getElementById('dropzone');
+  if (dropzone) {
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        const fileInput = document.getElementById('resume_file');
+        fileInput.files = files;
+        handleFileSelect(fileInput);
+      }
+    });
+  }
+
+  function showExtractionLoader(form, titleText) {
+    const overlay = document.getElementById('extraction-overlay');
+    const title = document.getElementById('loader-title');
+    if (titleText) title.textContent = titleText;
+    
+    // Disable submit buttons to prevent double-submit
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite; margin-right: 0.5rem;">⚙</span> Processing...`;
+    }
+
+    overlay.classList.add('active');
+  }
+</script>
 {% endblock %}

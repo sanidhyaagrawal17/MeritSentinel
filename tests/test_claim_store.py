@@ -97,3 +97,98 @@ def test_claim_mastery_gating_and_eligibility(claim_store):
     assert len(answers) == 1
     assert answers[0].raw_score == 4
     assert answers[0].evidence_quote == "Candidate explained SQLite WAL mode clearly."
+
+
+def test_clear_user_data_preserves_confirmed_claims_and_mastery(claim_store):
+    user_id = "test_user_clear_safety"
+
+    # Profile facts: 1 confirmed, 1 unconfirmed
+    fact_confirmed = ProfileFact(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        fact_type=ProfileFactType.NAME,
+        value="Sanidhya Agrawal",
+        source_line=1,
+        is_confirmed=True
+    )
+    fact_unconfirmed = ProfileFact(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        fact_type=ProfileFactType.LOCATION,
+        value="Indore, India",
+        source_line=2,
+        is_confirmed=False
+    )
+    claim_store.save_profile_fact(fact_confirmed)
+    claim_store.save_profile_fact(fact_unconfirmed)
+
+    # Claims: 1 confirmed, 1 unconfirmed (extracted)
+    confirmed_claim_id = str(uuid.uuid4())
+    claim_confirmed = Claim(
+        id=confirmed_claim_id,
+        user_id=user_id,
+        claim_type=ClaimType.PROJECT_METRIC,
+        text="Trained defect inspection pipeline reaching 61.7% mAP50 on NEU-DET.",
+        tools=["PyTorch", "YOLO11"],
+        metric_values=["61.7% mAP50"],
+        source_line=10,
+        status=ClaimStatus.CONFIRMED
+    )
+    extracted_claim_id = str(uuid.uuid4())
+    claim_extracted = Claim(
+        id=extracted_claim_id,
+        user_id=user_id,
+        claim_type=ClaimType.SKILL,
+        text="Python programming",
+        tools=["Python"],
+        metric_values=[],
+        source_line=15,
+        status=ClaimStatus.EXTRACTED
+    )
+    claim_store.save_claim(claim_confirmed)
+    claim_store.save_claim(claim_extracted)
+
+    # Add answer record and mastery state for confirmed claim
+    answer = AnswerRecord(
+        id=str(uuid.uuid4()),
+        claim_id=confirmed_claim_id,
+        raw_score=4,
+        evidence_quote="Candidate explained anchor-free detection mechanics."
+    )
+    mastery = MasteryState(
+        claim_id=confirmed_claim_id,
+        aggregate_score=3.5,
+        effective_score=3.2,
+        confidence=0.8,
+        n_effective=3.0,
+        total_answers=3,
+        is_eligible=True,
+        last_updated=datetime.now(timezone.utc)
+    )
+    claim_store.save_answer_and_mastery(answer, mastery)
+
+    # Now clear user data (simulating resume re-upload)
+    claim_store.clear_user_data(user_id)
+
+    # Verify unconfirmed profile fact was deleted, but confirmed profile fact remains
+    facts = claim_store.get_profile_facts(user_id)
+    assert len(facts) == 1
+    assert facts[0].id == fact_confirmed.id
+    assert facts[0].value == "Sanidhya Agrawal"
+
+    # Verify extracted claim was deleted, but confirmed claim remains
+    claims = claim_store.get_claims(user_id)
+    assert len(claims) == 1
+    assert claims[0].id == confirmed_claim_id
+    assert claims[0].status == ClaimStatus.CONFIRMED
+
+    # Verify mastery state and answer records are intact
+    saved_mastery = claim_store.get_mastery_state(confirmed_claim_id)
+    assert saved_mastery is not None
+    assert saved_mastery.is_eligible is True
+    assert saved_mastery.effective_score == 3.2
+
+    saved_answers = claim_store.get_answer_records(confirmed_claim_id)
+    assert len(saved_answers) == 1
+    assert saved_answers[0].raw_score == 4
+

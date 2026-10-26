@@ -9,6 +9,7 @@ Real-model extraction quality is verified manually with Ollama (qwen2.5:3b).
 import pytest
 from pathlib import Path
 from resumeproof.core.llm import FakeLLMClient
+from tests.fixtures.demo_fixtures import DEMO_FIXTURES
 from resumeproof.extractor.pdf_parser import parse_resume
 from resumeproof.extractor.claim_extractor import extract_from_resume
 from resumeproof.schemas.facts import ProfileFactType
@@ -20,7 +21,7 @@ DEMO_DIR = Path("data/demo")
 def test_parsing_pipeline_alex_rivera():
     """Parsing-pipeline test for Alex Rivera: validates schema adherence and fact separation via FakeLLMClient."""
     parsed = parse_resume(DEMO_DIR / "alex_rivera" / "resume.pdf")
-    client = FakeLLMClient()
+    client = FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)
     facts, claims = extract_from_resume(
         parse_result=parsed,
         llm_client=client,
@@ -62,7 +63,7 @@ def test_parsing_pipeline_alex_rivera():
 def test_parsing_pipeline_priya_nair():
     """Parsing-pipeline test for Priya Nair: validates schema adherence and fact separation via FakeLLMClient."""
     parsed = parse_resume(DEMO_DIR / "priya_nair" / "resume.pdf")
-    client = FakeLLMClient()
+    client = FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)
     facts, claims = extract_from_resume(
         parse_result=parsed,
         llm_client=client,
@@ -82,7 +83,7 @@ def test_parsing_pipeline_priya_nair():
 def test_parsing_pipeline_sam_okafor():
     """Parsing-pipeline test for Sam Okafor: validates schema adherence and fact separation via FakeLLMClient."""
     parsed = parse_resume(DEMO_DIR / "sam_okafor" / "resume.pdf")
-    client = FakeLLMClient()
+    client = FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)
     facts, claims = extract_from_resume(
         parse_result=parsed,
         llm_client=client,
@@ -104,7 +105,7 @@ def test_sam_okafor_has_no_employer_or_employment_dates_without_experience_secti
     For Sam Okafor (education, projects, skills only), employer_name and employment_dates must not exist.
     """
     parsed = parse_resume(DEMO_DIR / "sam_okafor" / "resume.pdf")
-    client = FakeLLMClient()
+    client = FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)
     facts, _ = extract_from_resume(
         parse_result=parsed,
         llm_client=client,

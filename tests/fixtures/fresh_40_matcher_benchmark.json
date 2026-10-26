@@ -1,0 +1,242 @@
+[
+  {
+    "id": "f01",
+    "label": "strong",
+    "req": "FastAPI REST microservices",
+    "claim": "Built RESTful API microservices using FastAPI and SQLite"
+  },
+  {
+    "id": "f02",
+    "label": "strong",
+    "req": "YOLO object detection on edge GPUs",
+    "claim": "Ultralytics YOLO11 defect inspection with ONNX on AWS EC2 GPU"
+  },
+  {
+    "id": "f03",
+    "label": "strong",
+    "req": "Vector semantic search engine",
+    "claim": "arXiv paper semantic search using ChromaDB HNSW vector index"
+  },
+  {
+    "id": "f04",
+    "label": "strong",
+    "req": "DNS wire protocol resolver",
+    "claim": "Unpacked 12-byte DNS headers and parsed A/CNAME records per RFC 1035"
+  },
+  {
+    "id": "f05",
+    "label": "strong",
+    "req": "Packet sniffing and network capture",
+    "claim": "Raw packet sniffer capturing TCP/IP traffic using Python sockets"
+  },
+  {
+    "id": "f06",
+    "label": "strong",
+    "req": "Python backend engineering",
+    "claim": "Python systems programming and backend development"
+  },
+  {
+    "id": "f07",
+    "label": "strong",
+    "req": "Model Context Protocol (MCP) server integration",
+    "claim": "FastAPI server exposing GameData tools over Model Context Protocol (MCP)"
+  },
+  {
+    "id": "f08",
+    "label": "strong",
+    "req": "Relational database connection pooling",
+    "claim": "Configured SQLite WAL mode with connection pooling sustaining 350 req/sec"
+  },
+  {
+    "id": "f09",
+    "label": "strong",
+    "req": "Deep learning model export to ONNX",
+    "claim": "Exported baseline PyTorch model to ONNX runtime format"
+  },
+  {
+    "id": "f10",
+    "label": "strong",
+    "req": "Automated integration testing with pytest",
+    "claim": "Engineered end-to-end integration test suite using pytest"
+  },
+  {
+    "id": "f11",
+    "label": "strong",
+    "req": "Docker containerization for APIs",
+    "claim": "Containerized FastAPI backend microservices with Docker"
+  },
+  {
+    "id": "f12",
+    "label": "strong",
+    "req": "RESTful API design and Pydantic validation",
+    "claim": "FastAPI application with strict Pydantic request and response schemas"
+  },
+  {
+    "id": "f13",
+    "label": "strong",
+    "req": "Computer vision defect inspection",
+    "claim": "Industrial surface defect detection pipeline evaluated on NEU-DET benchmark"
+  },
+  {
+    "id": "f14",
+    "label": "strong",
+    "req": "Postman API testing and collection automation",
+    "claim": "Automated REST endpoint validation workflows in Postman"
+  },
+  {
+    "id": "f15",
+    "label": "partial",
+    "req": "Flask microservices development",
+    "claim": "FastAPI backend REST API service"
+  },
+  {
+    "id": "f16",
+    "label": "partial",
+    "req": "PyTorch distributed DDP training",
+    "claim": "PyTorch baseline defect inspection model with single GPU training"
+  },
+  {
+    "id": "f17",
+    "label": "partial",
+    "req": "FAISS vector indexing",
+    "claim": "ChromaDB HNSW vector indexing for academic search"
+  },
+  {
+    "id": "f18",
+    "label": "partial",
+    "req": "PostgreSQL database administration",
+    "claim": "SQLite WAL database configuration and connection pooling"
+  },
+  {
+    "id": "f19",
+    "label": "partial",
+    "req": "TensorRT GPU inference optimization",
+    "claim": "ONNX Runtime GPU inference benchmarking on AWS EC2 Tesla T4"
+  },
+  {
+    "id": "f20",
+    "label": "partial",
+    "req": "UDP streaming socket service",
+    "claim": "Raw socket packet sniffer capturing TCP and UDP traffic"
+  },
+  {
+    "id": "f21",
+    "label": "partial",
+    "req": "YOLOv8 instance segmentation",
+    "claim": "YOLO11 bounding-box defect detection pipeline"
+  },
+  {
+    "id": "f22",
+    "label": "partial",
+    "req": "OpenAPI Swagger documentation",
+    "claim": "FastAPI REST API endpoints with interactive schema documentation"
+  },
+  {
+    "id": "f23",
+    "label": "partial",
+    "req": "gRPC microservices in Python",
+    "claim": "RESTful API microservices in FastAPI and Python"
+  },
+  {
+    "id": "f24",
+    "label": "partial",
+    "req": "Milvus distributed vector database",
+    "claim": "ChromaDB vector database for paper embeddings"
+  },
+  {
+    "id": "f25",
+    "label": "partial",
+    "req": "Prometheus API latency profiling",
+    "claim": "Benchmarked API latency with 1.6ms execution profiling"
+  },
+  {
+    "id": "f26",
+    "label": "partial",
+    "req": "AWS S3 object storage",
+    "claim": "AWS EC2 GPU cloud instance deployment and benchmarking"
+  },
+  {
+    "id": "f27",
+    "label": "partial",
+    "req": "Qdrant vector search",
+    "claim": "Vector embeddings for semantic search in ChromaDB"
+  },
+  {
+    "id": "f28",
+    "label": "gap",
+    "req": "Java Spring Boot enterprise backend",
+    "claim": "Python FastAPI backend service"
+  },
+  {
+    "id": "f29",
+    "label": "gap",
+    "req": "Kubernetes cluster orchestration",
+    "claim": "Docker single-container deployment"
+  },
+  {
+    "id": "f30",
+    "label": "gap",
+    "req": "Apache Kafka event streaming",
+    "claim": "SQLite local relational database"
+  },
+  {
+    "id": "f31",
+    "label": "gap",
+    "req": "React Native mobile development",
+    "claim": "Next.js React web dashboard"
+  },
+  {
+    "id": "f32",
+    "label": "gap",
+    "req": "Apache Cassandra distributed NoSQL",
+    "claim": "ChromaDB vector embedding store"
+  },
+  {
+    "id": "f33",
+    "label": "gap",
+    "req": "Terraform infrastructure as code",
+    "claim": "Python automation scripting"
+  },
+  {
+    "id": "f34",
+    "label": "gap",
+    "req": "Redis in-memory caching cluster",
+    "claim": "SQLite connection pool"
+  },
+  {
+    "id": "f35",
+    "label": "gap",
+    "req": "GraphQL schema design with Apollo",
+    "claim": "RESTful API design with FastAPI"
+  },
+  {
+    "id": "f36",
+    "label": "gap",
+    "req": "Rust memory safety and concurrency",
+    "claim": "Python backend microservices"
+  },
+  {
+    "id": "f37",
+    "label": "gap",
+    "req": "Apache Spark large-scale batch processing",
+    "claim": "PyTorch neural network training"
+  },
+  {
+    "id": "f38",
+    "label": "gap",
+    "req": "Go goroutine concurrency",
+    "claim": "Python asyncio event loop"
+  },
+  {
+    "id": "f39",
+    "label": "gap",
+    "req": "Elasticsearch full-text log analytics",
+    "claim": "SQLite relational database"
+  },
+  {
+    "id": "f40",
+    "label": "gap",
+    "req": "Snowflake cloud data warehousing",
+    "claim": "FastAPI web application"
+  }
+]

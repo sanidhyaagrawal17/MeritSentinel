@@ -1,0 +1,42 @@
+MARCUS CHEN
+marcus.chen@example.com | 555-0182 | Seattle, WA
+
+EDUCATION
+University of Washington, Seattle, WA
+Bachelor of Science in Computer Science; CGPA: 3.72 / 4.0
+2021 - 2025
+
+TECHNICAL SKILLS
+Languages: Python, Go, TypeScript,
+SQL, C++
+Frameworks & Databases: FastAPI, PostgreSQL,
+ChromaDB, Redis, React
+Developer Tools: Docker, Git, Linux,
+pytest, Postman
+
+FEATURED PROJECTS
+VectorMesh - High-Throughput Embedding Gateway 2026
+Python, ChromaDB, FastAPI, Docker github.com/marcus-chen/vectormesh
+- Built a vector embedding gateway indexing 250,000 document vectors with
+sub-10ms retrieval latency across HNSW graph indexes.
+- Configured connection pooling to 20 connections sustaining
+400 concurrent read req/sec during stress benchmarks.
+- Automated test suite with 15 pytest unit tests
+reaching 94% branch coverage in CI workflows.
+
+SecureLedger - Cryptographic Audit Trail 2025
+Go, SQLite, Docker, JWT github.com/marcus-chen/secureledger
+- Developed an append-only cryptographic transaction log verifying
+merkle proofs for 50,000 transactions per block.
+- Implemented JWT token verification validating user
+roles before issuing cryptographically signed ledger updates.
+
+WORK EXPERIENCE
+Northwest Software Labs, Seattle, WA
+Software Engineering Intern (June 2024 - September 2024)
+- Developed automated performance regression pipelines in Python,
+reducing deployment verification cycle times by 35%.
+
+COURSEWORK & COMPETITIONS
+ACM ICPC Regional Contest 2024: 12th Place Finalist.
+Certified Kubernetes Application Developer (CKAD 2025).

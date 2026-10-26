@@ -1,0 +1,131 @@
+{
+  "timestamp": "2026-10-26T11:45:00Z",
+  "hardware_environment": {
+    "cpu": "AMD Ryzen 7 7735HS with Radeon Graphics (8 cores, 16 logical processors @ 3.20 GHz base, up to 4.75 GHz boost)",
+    "system_ram_gb": 16.0,
+    "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "vram_gb": 6.0,
+    "vram_type": "GDDR6",
+    "os": "Microsoft Windows 11 Home (64-bit)",
+    "ollama_version": "0.5.12",
+    "ollama_gpu_offload_ratio": "100% (all layers offloaded to NVIDIA RTX 4050 Laptop GPU via CUDA)"
+  },
+  "component_benchmarks": {
+    "matcher_embedding": {
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "framework": "fastembed-0.9.1 / onnxruntime-1.31.0",
+      "dimensions": 384,
+      "latency_ms_per_pair": 1.68,
+      "silent_fallback_check": "FAIL_FAST (raises RuntimeError on empty or zero embeddings)"
+    },
+    "strict_verifier": {
+      "engine": "Deterministic Regex & Span Subsumption (Zero LLM in path)",
+      "latency_ms_per_sentence": 0.32
+    },
+    "ollama_qwen2_5_3b": {
+      "structured_endpoint": "http://127.0.0.1:11434/api/chat",
+      "format": "json_schema",
+      "warm_latency_ms": 531.57
+    },
+    "ollama_qwen2_5_7b": {
+      "structured_endpoint": "http://127.0.0.1:11434/api/chat",
+      "format": "json_schema",
+      "cold_start_latency_ms": 9967.68,
+      "warm_latency_ms": 128.88
+    }
+  },
+  "held_out_matcher_evaluation_60_pairs": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "total_pairs": 60,
+    "frozen_synonyms": true,
+    "thresholds": {
+      "strong": 0.30,
+      "partial": 0.15
+    },
+    "class_metrics": {
+      "strong": {
+        "ground_truth": 20,
+        "tp": 18,
+        "fp": 2,
+        "fn": 2,
+        "tn": 38,
+        "precision": 0.9000,
+        "recall": 0.9000
+      },
+      "partial": {
+        "ground_truth": 20,
+        "tp": 13,
+        "fp": 3,
+        "fn": 7,
+        "tn": 37,
+        "precision": 0.8125,
+        "recall": 0.6500
+      },
+      "gap": {
+        "ground_truth": 20,
+        "tp": 19,
+        "fp": 5,
+        "fn": 1,
+        "tn": 35,
+        "precision": 0.7917,
+        "recall": 0.9500
+      }
+    },
+    "mean_scores": {
+      "strong": 0.4087,
+      "partial": 0.1881,
+      "gap": 0.0674
+    },
+    "strong_to_gap_discrimination_margin": 0.3413
+  },
+  "verifier_evaluation": {
+    "original_100_sentences": {
+      "total_sentences": 100,
+      "grounded_valid_sentences": 49,
+      "adversarial_unbacked_sentences": 51,
+      "tp": 49,
+      "fp": 0,
+      "fn": 0,
+      "tn": 51,
+      "precision": 1.0000,
+      "recall": 1.0000,
+      "false_positive_rate": 0.0000,
+      "leak_rate": 0.0000
+    },
+    "new_adversarial_30_sentences": {
+      "total_adversarial_sentences": 30,
+      "blocked_tn": 30,
+      "leaked_fp": 0,
+      "false_positive_rate": 0.0000,
+      "categories_tested": [
+        "fabricated_metrics",
+        "unbacked_tools",
+        "role_overclaims",
+        "fabricated_employers_and_education",
+        "prompt_injections",
+        "homoglyph_obfuscations",
+        "architecture_hallucinations"
+      ]
+    }
+  },
+  "real_7b_grader_discrimination": {
+    "model": "qwen2.5:7b",
+    "total_rubric_items": 5,
+    "evaluated_answers_per_item": 4,
+    "total_evaluations": 20,
+    "weak_monotonic_ordering": "5/5 (100.0%)",
+    "strict_monotonic_ordering": "0/5 (both Strong and Terse satisfied ground-truth points, receiving 4/4)",
+    "wrong_topic_scored_zero": "5/5 (100.0%)"
+  },
+  "candidate_claim_reconciliation": {
+    "ground_truth_count": 60,
+    "breakdown": {
+      "project_metrics": 12,
+      "project_tools": 20,
+      "technical_skills": 23,
+      "experience_claims": 2,
+      "achievements": 3
+    },
+    "reconciliation_notes": "Previous 61 count resulted from FakeLLMClient structured completion fallback emitting 1 synthetic skill claim ('Python programming and REST APIs') that matched resume line 24. Eliminating the synthetic fallback yields exact 60 count."
+  }
+}

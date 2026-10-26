@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-26",
+  "model": "qwen2.5:7b",
+  "repetitions_per_cell": 3,
+  "item_level_means": {
+    "item_1_sqlite_wal": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      4.0
+    ],
+    "item_2_dns_rfc1035": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      4.0
+    ],
+    "item_3_neu_det_benchmark": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      4.0
+    ],
+    "item_4_p2_ablation": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      4.0
+    ],
+    "item_5_onnx_latency": [
+      0.0,
+      1.0,
+      2.0,
+      4.0,
+      4.0
+    ]
+  },
+  "coverage_level_means": [
+    0.0,
+    1.0,
+    2.0,
+    4.0,
+    4.0
+  ],
+  "monotonic_flags": {
+    "item_1_sqlite_wal": true,
+    "item_2_dns_rfc1035": true,
+    "item_3_neu_det_benchmark": true,
+    "item_4_p2_ablation": true,
+    "item_5_onnx_latency": true
+  },
+  "monotonic_count": 5,
+  "total_items": 5
+}

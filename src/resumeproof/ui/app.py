@@ -9,7 +9,7 @@ import uuid
 import re
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -128,6 +128,15 @@ async def index(request: Request):
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Serves application favicon."""
+    fav_path = Path("src/resumeproof/ui/static/favicon.svg")
+    if fav_path.exists():
+        return FileResponse(fav_path, media_type="image/svg+xml")
+    return Response(status_code=204)
+
+
 @app.post("/upload")
 async def upload_resume(
     request: Request,
@@ -192,6 +201,7 @@ async def upload_resume(
         persona_id=effective_persona,
     )
 
+    claim_store.clear_user_data(user_id)
     # Persist in DB
     for f in facts:
         claim_store.save_profile_fact(f)
@@ -256,7 +266,7 @@ async def confirm_claim(
     # Return partial row for HTMX swap
     return HTMLResponse(
         f"""
-        <tr id="claim-{c.id}">
+        <tr id="claim-{c.id}" data-id="{c.id}" data-type="{c.claim_type.value}" data-project="{c.project_id or ''}" data-status="{c.status.value}">
           <td>
             <span class="badge badge-neutral">{c.claim_type.value}</span>
             {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{c.project_id}</code></div>' if c.project_id else ''}
@@ -306,7 +316,7 @@ async def reject_claim(
 
     return HTMLResponse(
         f"""
-        <tr id="claim-{c.id}">
+        <tr id="claim-{c.id}" data-id="{c.id}" data-type="{c.claim_type.value}" data-project="{c.project_id or ''}" data-status="{c.status.value}">
           <td>
             <span class="badge badge-neutral">{c.claim_type.value}</span>
             {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{c.project_id}</code></div>' if c.project_id else ''}
@@ -339,6 +349,117 @@ async def reject_claim(
         </tr>
         """
     )
+
+
+@app.post("/review/{user_id}/confirm_fact", response_class=HTMLResponse)
+async def confirm_fact(
+    request: Request,
+    user_id: str,
+    fact_id: str = Form(...),
+):
+    """Confirms an individual profile fact."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.confirm_profile_fact(fact_id=fact_id)
+    f = claim_store.get_profile_fact(fact_id)
+    if not f:
+        return HTMLResponse("")
+    return HTMLResponse(
+        f"""
+        <div class="fact-card" id="fact-{f.id}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+          <div>
+            <div class="fact-card-label">{f.fact_type.value.replace('_', ' ')}</div>
+            <div class="fact-card-value">{f.value}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-success" style="font-size: 0.7rem;">Confirmed</span>
+            <button 
+              class="btn btn-secondary btn-sm"
+              hx-post="/review/{user_id}/reject_fact"
+              hx-vals='{{"fact_id": "{f.id}"}}'
+              hx-target="#fact-{f.id}"
+              hx-swap="outerHTML">
+              Undo
+            </button>
+          </div>
+        </div>
+        """
+    )
+
+
+@app.post("/review/{user_id}/reject_fact", response_class=HTMLResponse)
+async def reject_fact(
+    request: Request,
+    user_id: str,
+    fact_id: str = Form(...),
+):
+    """Unconfirms/rejects an individual profile fact."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.reject_profile_fact(fact_id=fact_id)
+    f = claim_store.get_profile_fact(fact_id)
+    if not f:
+        return HTMLResponse("")
+    return HTMLResponse(
+        f"""
+        <div class="fact-card" id="fact-{f.id}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+          <div>
+            <div class="fact-card-label">{f.fact_type.value.replace('_', ' ')}</div>
+            <div class="fact-card-value">{f.value}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="badge badge-neutral" style="font-size: 0.7rem;">Pending</span>
+            <button 
+              class="btn btn-success btn-sm"
+              hx-post="/review/{user_id}/confirm_fact"
+              hx-vals='{{"fact_id": "{f.id}"}}'
+              hx-target="#fact-{f.id}"
+              hx-swap="outerHTML">
+              Confirm
+            </button>
+          </div>
+        </div>
+        """
+    )
+
+
+@app.post("/review/{user_id}/confirm_all")
+async def confirm_all(
+    request: Request,
+    user_id: str,
+    persona: Optional[str] = Form(None),
+):
+    """Bulk confirms all claims for the user. Profile facts must be confirmed individually."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.bulk_update_claims(user_id=user_id, action=ClaimStatus.CONFIRMED)
+    return RedirectResponse(url=f"/review/{user_id}?persona={persona or ''}", status_code=303)
+
+
+@app.post("/review/{user_id}/reject_all")
+async def reject_all(
+    request: Request,
+    user_id: str,
+    persona: Optional[str] = Form(None),
+):
+    """Bulk rejects all claims for the user."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.bulk_update_claims(user_id=user_id, action=ClaimStatus.REJECTED)
+    return RedirectResponse(url=f"/review/{user_id}?persona={persona or ''}", status_code=303)
+
+
+@app.post("/review/{user_id}/reset_all")
+async def reset_all(
+    request: Request,
+    user_id: str,
+    persona: Optional[str] = Form(None),
+):
+    """Resets all claims back to extracted (pending)."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.bulk_update_claims(user_id=user_id, action=ClaimStatus.EXTRACTED)
+    return RedirectResponse(url=f"/review/{user_id}?persona={persona or ''}", status_code=303)
 
 
 @app.post("/review/{user_id}/start_interview")
@@ -694,5 +815,5 @@ async def download_pdf(user_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("resumeproof.ui.app:app", host=settings.ui_host, port=settings.ui_port, reload=True)
+    uvicorn.run("resumeproof.ui.app:app", host=settings.ui_host, port=settings.ui_port, reload=False)
 

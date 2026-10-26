@@ -209,27 +209,150 @@ def _map_resume_lines(parse_result: ParseResult) -> tuple[dict[int, str], dict[i
 
     return line_sections, line_projects, has_experience_section
 
-def deduplicate_claims(claims: list[Claim]) -> list[Claim]:
-    """Deduplicates claims having identical text or duplicate tools plus metrics."""
-    unique: list[Claim] = []
-    seen_texts: set[str] = set()
-    seen_tools_metrics: set[tuple[tuple[str, ...], tuple[str, ...]]] = set()
+def is_tech_stack_line(text: str) -> bool:
+    """Detects if a line in a project section is a tech-stack line."""
+    clean = text.strip()
+    if not clean:
+        return False
+    # Project title lines ending with colon (e.g. "Task-Tracker API (Python, FastAPI, SQLite):") are headings, NOT stack lines
+    if clean.endswith(":"):
+        return False
+    # Heading lines with dates (e.g. "GameData MCP - Video Game Analytics 2026") are headings, NOT stack lines
+    if re.search(r"\b20\d\d\b", clean) and (" - " in clean or "(" in clean):
+        return False
+    # If it starts with common stack prefixes (with optional markdown bold/italics/bullet)
+    if re.match(r"^(?:[-*•►\s_`*]*)(?:tech\s*stack|technologies|tools|built\s*with|stack|core\s*stack)\s*:\s*", clean, re.IGNORECASE):
+        return True
+    # Bullet points without stack prefixes are not stack lines
+    if clean.startswith(("-", "*", "•", "►")) and not re.search(r"^(?:[-*•►\s_`*]*)(?:tech\s*stack|technologies|tools)\s*:", clean, re.IGNORECASE):
+        return False
+    # If ends with period (and not a URL like .com or .io)
+    if clean.endswith(".") and not re.search(r"\.(?:com|org|io|dev|ai|net|app|git)\.?$", clean, re.IGNORECASE):
+        return False
+    # If starts with an action verb, it's a descriptive bullet/sentence
+    first_word = re.split(r"[\s\-]+", clean.lstrip("#*•►_` "))[0].lower()
+    ACTION_VERBS = {
+        "built", "implemented", "developed", "trained", "benchmarked",
+        "exported", "architected", "designed", "engineered", "created",
+        "deployed", "tracked", "captured", "parsed", "prevented",
+        "delivered", "taught", "authored", "led", "managed", "conducted",
+        "analyzed", "evaluated", "integrated", "automated", "optimized"
+    }
+    if first_word in ACTION_VERBS:
+        return False
+    # If it contains repo link or url
+    if any(k in clean.lower() for k in ["github.com", "gitlab.com", "bitbucket.org", "http://", "https://"]):
+        return True
+    # If contains delimiters like comma, pipe, slash, bullet and has reasonable length
+    if ("," in clean or "|" in clean or " / " in clean) and len(clean.split()) <= 15:
+        return True
+    return False
 
+def split_tech_stack_line(raw_text: str) -> list[str]:
+    """Extracts individual tool names from a tech stack line."""
+    clean = re.sub(r"^(?:[-*•►\s_`*]*)(?:tech\s*stack|technologies|tools|built\s*with|stack|core\s*stack)\s*:\s*", "", raw_text, flags=re.IGNORECASE).strip()
+    # Strip markdown links e.g. [Title](url)
+    clean = re.sub(r"\[.*?\]\(.*?\)", "", clean)
+    # Remove repo links / urls
+    clean = re.sub(r"https?://\S+", "", clean)
+    clean = re.sub(r"(?:github\.com|gitlab\.com|bitbucket\.org)\S*", "", clean)
+    clean = re.sub(r"\[(?:code|link|demo|repo|github)\]", "", clean, flags=re.IGNORECASE)
+    # Strip trailing dashes or separators
+    clean = re.sub(r"\s*[-—–]\s*$", "", clean)
+    items = re.split(r"[,|•;]+", clean)
+    tools = []
+    for item in items:
+        t = item.strip().strip("-*•·▪► /()[]—–_`*")
+        if not t:
+            continue
+        if re.search(r"^\d{4}$", t) or "github.com" in t.lower() or "http" in t.lower():
+            continue
+        # Skip if it looks like a project title with parenthesis or colon
+        if any(w in t.lower() for w in ["api", "store", "resolver", "server", "gateway", "service"]) and len(t.split()) > 2 and ("(" in t or ":" in t):
+            continue
+        if len(t) >= 2 and not t.lower().startswith("claim:"):
+            tools.append(t)
+    return tools
+
+def deduplicate_claims(claims: list[Claim]) -> list[Claim]:
+    """Deduplicates claims having identical type, project, and text, removes section headers,
+    project title headings, tech stack lines, sub-fragment metrics, and duplicate tool claims."""
+    # Step 1: Filter out headers, project title lines, and raw stack lines
+    filtered: list[Claim] = []
     for c in claims:
+        t = c.text.strip()
+        t_upper = t.upper().rstrip(":")
+        if detect_section_header(t) or t_upper in (
+            "FEATURED PROJECTS", "TECHNICAL SKILLS", "EXPERIENCE", "PROJECTS",
+            "EDUCATION", "COURSEWORK & COMPETITIONS", "ACHIEVEMENTS", "SUMMARY",
+            "SKILLS", "WORK EXPERIENCE", "LANGUAGES", "TOOLS"
+        ):
+            continue
+        # Project title lines: e.g. "GameData MCP - Video Game Analytics & MCP Query Server 2026"
+        if " - " in t and any(yr in t for yr in ["2023", "2024", "2025", "2026", "2027"]) and len(t.split()) <= 12 and not any(v in t.lower() for v in ["built", "implemented", "trained", "developed", "served", "delivered", "taught"]):
+            continue
+        # Tech stack lines falsely emitted as project_metric or experience_claim
+        if is_tech_stack_line(t) and c.claim_type != ClaimType.TOOL:
+            continue
+        filtered.append(c)
+
+    # Step 2: Drop sub-fragment metrics or short phrases that are strict substrings of full bullet sentences
+    full_sentences = [c.text.lower() for c in filtered if len(c.text.split()) > 6]
+    no_subfragments: list[Claim] = []
+    for c in filtered:
+        t_lower = c.text.strip().lower()
+        if len(c.text.split()) <= 6 and any(t_lower in full_s and t_lower != full_s for full_s in full_sentences):
+            # Keep legitimate individual tool or skill claims
+            if c.claim_type == ClaimType.TOOL and c.project_id:
+                no_subfragments.append(c)
+            elif c.claim_type == ClaimType.SKILL and not bool(re.search(r"^\d+(\.\d+)?%?$|(\d+\s*(ms|req/sec|fps|mAP|%))", c.text, re.IGNORECASE)):
+                no_subfragments.append(c)
+            else:
+                # Sub-fragment metric or phrase like "61.7% mAP50", "62.2% validation", "ONNX format" -> drop
+                continue
+        else:
+            no_subfragments.append(c)
+
+    # Step 3: Text uniqueness and type disambiguation
+    # Process full bullet sentences, tool claims, and skills first so redundant short fragments are caught
+    def _claim_priority(c: Claim) -> int:
+        if len(c.text.split()) > 6:
+            return 0
+        if c.claim_type == ClaimType.TOOL:
+            return 1
+        if c.claim_type == ClaimType.SKILL:
+            return 2
+        return 3
+
+    sorted_candidates = sorted(no_subfragments, key=_claim_priority)
+    unique: list[Claim] = []
+    seen_keys: set[tuple] = set()
+    seen_tools_metrics: set[tuple] = set()
+
+    for c in sorted_candidates:
         clean_text = c.text.strip().lower()
-        if clean_text in seen_texts:
+        key = (c.claim_type, c.project_id, clean_text)
+        if key in seen_keys:
             continue
 
-        # If tools and metrics are both non-empty and identical to a previous claim, consider duplicate
+        # If a single tool name (e.g. "FastAPI", "JWT", "PyTorch") already exists as SKILL or TOOL, don't duplicate
+        if c.claim_type in (ClaimType.EXPERIENCE_CLAIM, ClaimType.PROJECT_METRIC) and len(c.text.split()) <= 4:
+            if any(other.text.strip().lower() == clean_text for other in unique):
+                continue
+            # If it's a metric or percentage fragment matching an already accepted bullet sentence
+            if any(clean_text in other.text.strip().lower() for other in unique if len(other.text.split()) > 6):
+                continue
+
+        # If tools and metrics are both non-empty and identical to a previous claim for this project, consider duplicate
         tools_tuple = tuple(sorted(t.strip().lower() for t in c.tools))
         metrics_tuple = tuple(sorted(m.strip().lower() for m in c.metric_values))
         if tools_tuple and metrics_tuple:
-            tm_key = (tools_tuple, metrics_tuple)
+            tm_key = (c.project_id, tools_tuple, metrics_tuple)
             if tm_key in seen_tools_metrics:
                 continue
             seen_tools_metrics.add(tm_key)
 
-        seen_texts.add(clean_text)
+        seen_keys.add(key)
         unique.append(c)
 
     return unique
@@ -338,14 +461,16 @@ def extract_from_resume(
             # If item is just a project heading
             if any(clean_item_text.lower() == p.lower() for p in line_projects.values()):
                 continue
-            # If item is a single tool name without bullet context
-            if ctype in (ClaimType.SKILL, ClaimType.TOOL) or (ctype == ClaimType.PROJECT_METRIC and len(clean_item_text.split()) <= 3 and not any(ch.isdigit() for ch in clean_item_text)):
-                continue
-            if ctype in (ClaimType.SKILL, ClaimType.TOOL):
+            # If item is a tool claim linked to a project, preserve it
+            if ctype == ClaimType.TOOL and project_id:
+                pass
+            elif ctype == ClaimType.SKILL:
                 if item.metric_values or any(char.isdigit() for char in item.text):
                     ctype = ClaimType.PROJECT_METRIC
                 else:
                     ctype = ClaimType.EXPERIENCE_CLAIM
+            elif ctype == ClaimType.PROJECT_METRIC and len(clean_item_text.split()) <= 3 and not any(ch.isdigit() for ch in clean_item_text):
+                continue
 
         # CRITICAL INVARIANT: split skill lines into one skill claim per skill
         if in_skills_section or (ctype == ClaimType.SKILL and not project_id and not in_project_or_exp_section):
@@ -438,6 +563,37 @@ def extract_from_resume(
                         )
                     ))
 
+    # Project Stack-Line Tools: Extract tools listed in project tech-stack lines
+    for line in parse_result.lines:
+        sec = line_sections.get(line.line_number)
+        if sec == "PROJECTS":
+            proj_id = line_projects.get(line.line_number)
+            if proj_id and is_tech_stack_line(line.text):
+                stack_tools = split_tech_stack_line(line.text)
+                for tool_name in stack_tools:
+                    # Avoid adding if identical tool claim already exists for this project
+                    if not any(c.project_id == proj_id and c.claim_type == ClaimType.TOOL and c.text.lower() == tool_name.lower() for c in claims):
+                        cid = str(uuid.uuid4())
+                        claims.append(Claim(
+                            id=cid,
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            project_id=proj_id,
+                            claim_type=ClaimType.TOOL,
+                            text=tool_name,
+                            tools=[tool_name],
+                            metric_values=[],
+                            source_line=line.line_number,
+                            source_page=1,
+                            status=ClaimStatus.EXTRACTED,
+                            audit=ClaimAudit(
+                                extractor_text=tool_name,
+                                extractor_tools=[tool_name],
+                                extractor_metrics=[],
+                                action_taken=ClaimStatus.EXTRACTED
+                            )
+                        ))
+
     # Bullet fallback: ensure all bullets in project/experience/achievements sections are captured
     for line in parse_result.lines:
         sec = line_sections.get(line.line_number)
@@ -446,6 +602,8 @@ def extract_from_resume(
             continue
 
         if sec == "PROJECTS":
+            if is_tech_stack_line(txt):
+                continue
             clean_txt = re.sub(r"^[-*•►]\s*", "", txt).strip()
             clean_txt = re.sub(r"^claim:\s*", "", clean_txt, flags=re.IGNORECASE).strip()
             is_bullet = txt.startswith(("-", "*", "•", "►")) or txt.lower().startswith("claim:")
@@ -456,7 +614,7 @@ def extract_from_resume(
 
             if not is_bullet and not ends_with_period and not has_action_verb:
                 continue
-            if not has_action_verb and not is_bullet and ("github.com" in txt or any(t in txt for t in ["Python,", "FastAPI,", "React,", "PyTorch,"])):
+            if not has_action_verb and not is_bullet and ("github.com" in txt or any(t in txt for t in ["Python,", "FastAPI,", "React,", "PyTorch,"]) or is_tech_stack_line(txt)):
                 continue
 
             if clean_txt and (has_action_verb or is_bullet or ends_with_period) and len(clean_txt) >= 15:

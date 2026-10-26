@@ -70,12 +70,41 @@ class TailoringEngine:
         self.match_cutoff = match_cutoff
         self.adversarial_detector = adversarial_detector or AdversarialDetector()
 
-    def is_claim_eligible(self, claim: Claim, mastery: Optional[MasteryState]) -> bool:
-        """Determines if a claim is strictly eligible for inclusion in tailored resume."""
-        # Must be confirmed by candidate
+    def is_claim_eligible(
+        self,
+        claim: Claim,
+        mastery: Optional[MasteryState],
+        all_claims: Optional[list[Claim]] = None,
+        mastery_map: Optional[dict[str, MasteryState]] = None,
+    ) -> bool:
+        """Determines if a claim is strictly eligible for inclusion in tailored resume.
+
+        Project stack-line tools (ClaimType.TOOL with project_id) are eligible if:
+        1. Confirmed by candidate in review (claim.status == ClaimStatus.CONFIRMED), OR
+        2. Their parent project has at least one mastery-eligible claim.
+
+        All other claims must be confirmed AND meet mastery thresholds.
+        """
+        ctype_val = getattr(claim.claim_type, "value", str(claim.claim_type)).lower()
+        if ctype_val == "tool" and claim.project_id:
+            if claim.status == ClaimStatus.CONFIRMED:
+                return True
+            if all_claims and mastery_map:
+                for other in all_claims:
+                    if other.project_id == claim.project_id and other.id != claim.id:
+                        other_m = mastery_map.get(other.id)
+                        if (
+                            other.status == ClaimStatus.CONFIRMED
+                            and other_m is not None
+                            and other_m.effective_score >= self.score_threshold
+                            and other_m.confidence >= self.confidence_threshold
+                        ):
+                            return True
+            return False
+
+        # Standard claims (metrics, experience, skills)
         if claim.status != ClaimStatus.CONFIRMED:
             return False
-        # Must meet mastery thresholds
         if mastery is None:
             return False
         return (
@@ -135,7 +164,7 @@ class TailoringEngine:
             if best_idx >= 0 and best_score.total >= self.match_cutoff:
                 best_claim = claims[best_idx]
                 m_state = mastery_map.get(best_claim.id)
-                is_eligible = self.is_claim_eligible(best_claim, m_state)
+                is_eligible = self.is_claim_eligible(best_claim, m_state, all_claims=claims, mastery_map=mastery_map)
 
                 if is_eligible:
                     gap_report.matched_and_defensible.append(RequirementGap(
@@ -187,7 +216,10 @@ class TailoringEngine:
         fact_dict: dict[ProfileFactType, ProfileFact] = {f.fact_type: f for f in confirmed_facts}
 
         # 2. Filter eligible claims
-        eligible_claims = [c for c in claims if self.is_claim_eligible(c, mastery_map.get(c.id))]
+        eligible_claims = [
+            c for c in claims
+            if self.is_claim_eligible(c, mastery_map.get(c.id), all_claims=claims, mastery_map=mastery_map)
+        ]
 
         # Rank eligible claims by relevance to JD requirements
         ranked_claims: list[tuple[Claim, float]] = []
@@ -280,7 +312,16 @@ class TailoringEngine:
                 md_lines.append(pheader)
                 attribution_trace[pheader] = f"project:{pid}"
 
-                for c in pclaims:
+                tools_in_proj = [c for c in pclaims if getattr(c.claim_type, "value", str(c.claim_type)).lower() == "tool"]
+                bullets_in_proj = [c for c in pclaims if getattr(c.claim_type, "value", str(c.claim_type)).lower() != "tool"]
+
+                if tools_in_proj:
+                    tech_str = ", ".join(sorted(set(t.text for t in tools_in_proj)))
+                    stack_line = f"Technologies: {tech_str}"
+                    md_lines.append(stack_line)
+                    attribution_trace[stack_line] = f"project_tools:{pid}"
+
+                for c in bullets_in_proj:
                     bullet = f"- {c.text}"
                     md_lines.append(bullet)
                     attribution_trace[bullet] = c.id

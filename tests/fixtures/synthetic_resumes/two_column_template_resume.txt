@@ -1,0 +1,40 @@
+================================================================================
+KAVYA IYER
+kavya.iyer@example.com | +91-9876543210 | Bengaluru, Karnataka, India
+linkedin.com/in/kavya-iyer | github.com/kavya-iyer
+================================================================================
+
+[COLUMN 1: PROFILE & SKILLS]
+EDUCATION
+National Institute of Technology, Karnataka (NITK)
+B.Tech in Computer Science and Engineering
+CGPA: 8.1 / 10.0 (2022 - 2026)
+
+TECHNICAL SKILLS
+Languages: Python, Go, SQL, TypeScript
+Backend & Systems: FastAPI, Redis, PostgreSQL, SQLite, Docker
+ML & AI: PyTorch, ONNX, ChromaDB, Scikit-Learn
+Testing & Tools: pytest, Git, Linux, Postman
+
+COURSEWORK & COMPETITIONS
+Smart India Hackathon 2024: Top 30 Finalist.
+ACM-ICPC Amritapuri Regional 2024: Participant.
+
+--------------------------------------------------------------------------------
+[COLUMN 2: PROJECTS & EXPERIENCE]
+FEATURED PROJECTS
+CacheMesh - Distributed In-Memory Cache (2026)
+Go, Redis, gRPC github.com/kavya-iyer/cachemesh
+- Engineered multi-node distributed cache cluster handling 45,000 req/sec at p99 latency 1.8ms.
+- Built Raft-based consensus election module ensuring zero split-brain data inconsistency.
+
+PulseScan - Automated Defect Detection Pipeline (2026)
+Python, PyTorch, ONNX Runtime, FastAPI github.com/kavya-iyer/pulsescan
+- Trained YOLO-based defect classification model reaching 63.5% mAP50 on benchmark test split.
+- Exported inference runtime to ONNX achieving 2.2ms latency per frame on GPU instances.
+
+WORK EXPERIENCE
+InfraCloud Systems, Bengaluru, India
+Software Engineering Intern (May 2025 - July 2025)
+- Developed API rate-limiting middleware in Go, reducing unauthorized bursts by 40%.
+- Authored 25 unit and integration tests achieving 92% code coverage.

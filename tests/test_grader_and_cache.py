@@ -205,3 +205,31 @@ def test_confident_wrong_topic_answer_scores_zero_against_rubric():
     assert len(grade.evidence_quote) > 0
     assert len(grade.feedback) > 0
 
+
+def test_grader_numeric_and_alias_quote_recovery():
+    """Validates numeric and synonym alias recovery (0.9999 <-> 99.99%, [150, 300] <-> 150-300ms, dict <-> dictionary)."""
+    from resumeproof.interview.grader import resolve_alias_or_numeric_quote
+
+    # 1. 0.9999 -> 99.99%
+    ans1 = "We sustained 45,000 req/sec maintaining 99.99% linearizability under Raft consensus."
+    recovered1 = resolve_alias_or_numeric_quote("0.9999", ans1)
+    assert recovered1 == "99.99%"
+    assert recovered1 in ans1
+
+    # 2. [150, 300] -> 150-300ms
+    ans2 = "Tuned heartbeat election timeouts to 150-300ms to balance stability and failover speed."
+    recovered2 = resolve_alias_or_numeric_quote("[150, 300]", ans2)
+    assert recovered2 == "150-300ms"
+    assert recovered2 in ans2
+
+    # 3. dict -> dictionary
+    ans3 = "Implemented an in-memory dictionary caching recently decoded packet headers."
+    recovered3 = resolve_alias_or_numeric_quote("dict", ans3)
+    assert recovered3 == "dictionary"
+    assert recovered3 in ans3
+
+    # 4. Unmatched alias returns None without false positive
+    ans4 = "Configured Cassandra cluster across three availability zones."
+    recovered4 = resolve_alias_or_numeric_quote("0.9999", ans4)
+    assert recovered4 is None
+

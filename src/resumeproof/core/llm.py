@@ -11,8 +11,8 @@ from resumeproof.core.telemetry import telemetry, CallMetrics
 
 logger = logging.getLogger("resumeproof.llm")
 
-def _clean_json_str(raw: str) -> str:
-    cleaned = raw.strip()
+def _clean_json_str(raw: Optional[str]) -> str:
+    cleaned = (raw or "").strip()
     if cleaned.startswith("```"):
         lines = cleaned.splitlines()
         if lines and lines[0].startswith("```"):
@@ -51,13 +51,19 @@ class LLMClient(ABC):
 class OpenAICompatibleClient(LLMClient):
     """Client for Ollama or OpenAI-compatible endpoints with json_schema fallback."""
 
-    def __init__(self, base_url: str = "http://localhost:11434"):
+    def __init__(self, base_url: str = "http://localhost:11434", api_key: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
-        self.v1_endpoint = f"{self.base_url}/v1/chat/completions"
+        self.api_key = api_key
+        self.headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        if "/v1" in self.base_url:
+            self.v1_endpoint = f"{self.base_url}/chat/completions"
+        else:
+            self.v1_endpoint = f"{self.base_url}/v1/chat/completions"
         self.ollama_endpoint = f"{self.base_url}/api/chat"
         self._tested_json_schema_support: Optional[bool] = None
         self._model_digests: dict[str, str] = {}
-        self._load_model_digests()
+        if "11434" in self.base_url or "localhost" in self.base_url or "127.0.0.1" in self.base_url:
+            self._load_model_digests()
 
     def _load_model_digests(self) -> None:
         try:
@@ -96,7 +102,7 @@ class OpenAICompatibleClient(LLMClient):
             "messages": messages,
             "temperature": temperature,
         }
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(timeout=timeout, headers=self.headers) as client:
             resp = client.post(self.v1_endpoint, json=payload)
             resp.raise_for_status()
             data = resp.json()
@@ -137,6 +143,7 @@ class OpenAICompatibleClient(LLMClient):
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
+                "max_tokens": 2000,
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
@@ -147,7 +154,8 @@ class OpenAICompatibleClient(LLMClient):
                 },
             }
             try:
-                with httpx.Client(timeout=timeout) as client:
+                probe_timeout = timeout
+                with httpx.Client(timeout=probe_timeout, headers=self.headers) as client:
                     resp = client.post(self.v1_endpoint, json=v1_payload)
                     if resp.status_code == 200:
                         self._tested_json_schema_support = True
@@ -168,38 +176,89 @@ class OpenAICompatibleClient(LLMClient):
                         return json.loads(_clean_json_str(content))
                     else:
                         logger.warning(
-                            f"/v1/chat/completions json_schema returned status {resp.status_code}: {resp.text}. Falling back to native Ollama format parameter."
+                            f"/v1/chat/completions json_schema returned status {resp.status_code}: {resp.text}."
                         )
                         self._tested_json_schema_support = False
             except Exception as e:
-                logger.warning(f"Failed calling /v1 json_schema ({e}); falling back to native Ollama format.")
+                logger.warning(f"Failed calling /v1 json_schema ({e}).")
                 self._tested_json_schema_support = False
 
-        # Step 2: Fallback to Ollama native /api/chat with format parameter
-        ollama_payload = {
-            "model": model,
-            "messages": messages,
-            "stream": False,
-            "format": schema_dict,
-            "options": {"temperature": temperature},
-        }
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.post(self.ollama_endpoint, json=ollama_payload)
-            resp.raise_for_status()
-            data = resp.json()
-            latency = (time.perf_counter() - start_time) * 1000
-            content = data["message"]["content"]
-            telemetry.log_call(CallMetrics(
-                model=model,
-                endpoint=self.ollama_endpoint,
-                structured_path_used="native_format",
-                prompt_tokens=data.get("prompt_eval_count", 0),
-                completion_tokens=data.get("eval_count", 0),
-                total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
-                latency_ms=latency,
-                digest=self.get_model_digest(model),
-            ))
-            return json.loads(_clean_json_str(content))
+        # Step 2: Fallback path based on server type
+        # If local Ollama server, use native format parameter on /api/chat
+        is_ollama = "127.0.0.1" in self.base_url or "localhost" in self.base_url or "ollama" in self.base_url.lower()
+        if is_ollama:
+            ollama_payload = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "format": schema_dict,
+                "options": {"temperature": temperature},
+            }
+            with httpx.Client(timeout=timeout, headers=self.headers) as client:
+                resp = client.post(self.ollama_endpoint, json=ollama_payload)
+                resp.raise_for_status()
+                data = resp.json()
+                latency = (time.perf_counter() - start_time) * 1000
+                content = data["message"]["content"]
+                telemetry.log_call(CallMetrics(
+                    model=model,
+                    endpoint=self.ollama_endpoint,
+                    structured_path_used="native_format",
+                    prompt_tokens=data.get("prompt_eval_count", 0),
+                    completion_tokens=data.get("eval_count", 0),
+                    total_tokens=data.get("prompt_eval_count", 0) + data.get("eval_count", 0),
+                    latency_ms=latency,
+                    digest=self.get_model_digest(model),
+                ))
+                return json.loads(_clean_json_str(content))
+        else:
+            # Remote OpenAI-compatible endpoint fallback: try json_object format with 429 retry
+            v1_fallback = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": 2000,
+                "response_format": {"type": "json_object"},
+            }
+            max_retries = 5
+            for attempt in range(max_retries):
+                with httpx.Client(timeout=timeout, headers=self.headers) as client:
+                    resp = client.post(self.v1_endpoint, json=v1_fallback)
+                    if resp.status_code == 429 and attempt < max_retries - 1:
+                        wait_time = float(resp.headers.get("Retry-After", 2.0)) + 2.0
+                        logger.warning(f"429 rate limit hit; waiting {wait_time:.1f}s before retry (attempt {attempt+1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    resp.raise_for_status()
+                    data = resp.json()
+                    latency = (time.perf_counter() - start_time) * 1000
+                    usage = data.get("usage", {})
+                    content = data["choices"][0]["message"]["content"]
+                    cleaned_content = _clean_json_str(content)
+                    if not cleaned_content and attempt < max_retries - 1:
+                        logger.warning(f"Empty content received from {model}; retrying attempt {attempt+1}/{max_retries}")
+                        time.sleep(2.0)
+                        continue
+                    try:
+                        parsed_json = json.loads(cleaned_content)
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Malformed JSON received from {model} ({e}); retrying attempt {attempt+1}/{max_retries}")
+                            time.sleep(2.0)
+                            continue
+                        raise
+
+                    telemetry.log_call(CallMetrics(
+                        model=model,
+                        endpoint=self.v1_endpoint,
+                        structured_path_used="json_object",
+                        prompt_tokens=usage.get("prompt_tokens", 0),
+                        completion_tokens=usage.get("completion_tokens", 0),
+                        total_tokens=usage.get("total_tokens", 0),
+                        latency_ms=latency,
+                        digest=self.get_model_digest(model),
+                    ))
+                    return parsed_json
 
 class FakeLLMClient(LLMClient):
     """Offline, deterministic LLM client for tests and CI with recorded fixtures."""
@@ -261,19 +320,21 @@ class FakeLLMClient(LLMClient):
         ))
         msg_str = " ".join(m.get("content", "") for m in messages)
 
-        # Check explicit fixture keys
-        for k, v in self.recorded_fixtures.items():
-            if k.lower() in msg_str.lower():
-                if isinstance(v, dict):
-                    return v
-                elif isinstance(v, str):
-                    return json.loads(v)
-
         # Check schema type name
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             schema_name = schema.__name__
         else:
             schema_name = str(schema.get("title", ""))
+
+        # Check explicit fixture keys matching schema
+        if "fullextraction" in schema_name.lower() or "rawprofile" in schema_name.lower():
+            for k, v in self.recorded_fixtures.items():
+                k_lower = k.lower()
+                if k_lower in msg_str.lower() or k_lower.replace("_", " ") in msg_str.lower():
+                    if isinstance(v, dict):
+                        return v
+                    elif isinstance(v, str):
+                        return json.loads(v)
 
         # GradeStructuredPayload handling
         if "grade" in schema_name.lower():
@@ -370,38 +431,7 @@ class FakeLLMClient(LLMClient):
             }
 
 
-        # Automatic detection of demo personas in resume text
-        from resumeproof.fixtures.demo_fixtures import DEMO_FIXTURES
-        msg_lower = msg_str.lower()
-        if "alex rivera" in msg_lower or "alex_rivera" in msg_lower:
-            return DEMO_FIXTURES["alex_rivera"]
-        if "priya nair" in msg_lower or "priya_nair" in msg_lower:
-            return DEMO_FIXTURES["priya_nair"]
-        if "sam okafor" in msg_lower or "sam_okafor" in msg_lower:
-            return DEMO_FIXTURES["sam_okafor"]
-
-        if "ProfileFact" in schema_name or "profile" in schema_name.lower():
-            return {
-                "profile_facts": [
-                    {"fact_type": "name", "value": "Test Candidate", "source_line": 1},
-                    {"fact_type": "email", "value": "candidate@example.com", "source_line": 1},
-                    {"fact_type": "phone", "value": "(555) 000-1111", "source_line": 1},
-                    {"fact_type": "education_institution", "value": "Tech University", "source_line": 3},
-                    {"fact_type": "cgpa", "value": "3.8 / 4.0", "source_line": 3},
-                    {"fact_type": "graduation_date", "value": "May 2022", "source_line": 3},
-                ],
-                "claims": []
-            }
-
         return {
             "profile_facts": [],
-            "claims": [
-                {
-                    "claim_type": "skill",
-                    "text": "Python programming and REST APIs",
-                    "tools": ["Python", "FastAPI"],
-                    "metric_values": [],
-                    "source_line": 10
-                }
-            ]
+            "claims": []
         }

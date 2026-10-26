@@ -1,12 +1,20 @@
-"""Deterministic hybrid matcher combining keyword/synonym, BM25, and local embeddings."""
+"""Deterministic hybrid matcher combining keyword/synonym, BM25, and local embeddings via fastembed."""
 
 from dataclasses import dataclass, field
 import hashlib
 import json
+import logging
 import math
 from pathlib import Path
 import re
 from typing import Optional
+
+from fastembed import TextEmbedding
+
+logger = logging.getLogger(__name__)
+
+PINNED_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+PINNED_FASTEMBED_VERSION = "0.9.1"
 
 # Standard stopwords for matching
 STOPWORDS = {
@@ -23,7 +31,8 @@ SYNONYMS = {
     "latency": {"p99", "p95", "response_time", "delay", "sub_millisecond", "ms"},
     "throughput": {"req_sec", "rps", "qps", "req/sec", "requests", "reqs"},
     "database": {"db", "sql", "sqlite", "postgres", "postgresql", "mysql", "duckdb"},
-    "api": {"rest", "restful", "fastapi", "endpoints", "backend", "grpc"},
+    "api": {"rest", "restful", "fastapi", "endpoints", "backend", "grpc", "json_rpc", "mcp", "rpc"},
+    "backend": {"api", "rest", "fastapi", "server", "mcp"},
     "caching": {"cache", "redis", "ttl", "in-memory", "cached"},
     "consensus": {"raft", "paxos", "replication", "leader", "election", "linearizable"},
     "concurrency": {"threads", "concurrent", "parallel", "locks", "pooling", "pool"},
@@ -34,6 +43,14 @@ SYNONYMS = {
     "k8s": {"kubernetes"},
     "kubernetes": {"k8s"},
     "ml": {"machine_learning", "gbdt", "lightgbm", "onnx", "model", "inference", "tabular"},
+    "vision": {"cv", "detection", "yolo", "yolo11", "inspection", "defect", "pytorch"},
+    "yolo": {"yolo11", "detection", "vision", "pytorch"},
+    "yolo11": {"yolo", "detection", "vision"},
+    "wal": {"write_ahead", "fsync", "o_direct", "disk_sync", "logger"},
+    "sync": {"fsync", "flush", "persistence"},
+    "graph": {"graphs", "networkx", "topology", "traversal", "nodes"},
+    "testing": {"pytest", "benchmark", "ablation", "eval", "tests", "unit_tests"},
+    "ablation": {"variant", "baseline", "benchmark", "comparison", "evaluation"},
 }
 
 
@@ -43,6 +60,7 @@ class MatchScore:
     keyword_score: float
     bm25_score: float
     embedding_score: float
+    embedding_model: str = PINNED_EMBEDDING_MODEL
 
     def as_dict(self) -> dict:
         return {
@@ -50,6 +68,7 @@ class MatchScore:
             "keyword_score": round(self.keyword_score, 4),
             "bm25_score": round(self.bm25_score, 4),
             "embedding_score": round(self.embedding_score, 4),
+            "embedding_model": self.embedding_model,
         }
 
 
@@ -68,37 +87,10 @@ def _expand_tokens_with_synonyms(tokens: list[str]) -> set[str]:
     return expanded
 
 
-def _compute_deterministic_embedding(text: str, dim: int = 128) -> list[float]:
-    """Computes a deterministic, fixed-dimension feature vector from subwords and character n-grams."""
-    vector = [0.0] * dim
-    tokens = _tokenize(text)
-    if not tokens:
-        return vector
-
-    # Word-level features and character 3-grams
-    features = list(tokens)
-    for t in tokens:
-        if len(t) >= 3:
-            for i in range(len(t) - 2):
-                features.append(t[i:i+3])
-
-    for feat in features:
-        h = int(hashlib.sha256(feat.encode("utf-8")).hexdigest(), 16)
-        idx = h % dim
-        sign = 1.0 if ((h >> 8) & 1) == 0 else -1.0
-        vector[idx] += sign
-
-    # L2 normalize
-    norm = math.sqrt(sum(x * x for x in vector))
-    if norm > 0.0:
-        vector = [x / norm for x in vector]
-    return vector
-
-
 def _cosine_similarity(v1: list[float], v2: list[float]) -> float:
-    """Computes cosine similarity between two normalized vectors."""
+    """Computes cosine similarity between two unit-normalized vectors [0, 1]."""
     dot = sum(a * b for a, b in zip(v1, v2))
-    return max(0.0, min(1.0, (dot + 1.0) / 2.0))
+    return max(0.0, min(1.0, float(dot)))
 
 
 class HybridMatcher:
@@ -107,14 +99,20 @@ class HybridMatcher:
     Guarantees:
     - 100% deterministic (no random seed, no temperature)
     - Zero LLM calls in scoring
+    - Real ONNX sentence embeddings via fastembed (pinned to sentence-transformers/all-MiniLM-L6-v2)
+    - Zero-tolerance failure: raises RuntimeError if embeddings return zeros or fail
     - Disk-cached embeddings
     """
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Optional[Path] = None, model_name: str = PINNED_EMBEDDING_MODEL):
+        self.model_name = model_name
         self.cache_dir = cache_dir or Path(".cache/matcher")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_file = self.cache_dir / "embeddings_cache.json"
+        model_hash = hashlib.sha256(self.model_name.encode("utf-8")).hexdigest()[:8]
+        self.cache_file = self.cache_dir / f"embeddings_cache_{model_hash}.json"
         self._disk_cache: dict[str, list[float]] = self._load_cache()
+        logger.info(f"Initialized HybridMatcher with fastembed model '{self.model_name}' (v{PINNED_FASTEMBED_VERSION})")
+        self._embedder = TextEmbedding(model_name=self.model_name)
 
     def _load_cache(self) -> dict[str, list[float]]:
         if self.cache_file.exists():
@@ -131,15 +129,33 @@ class HybridMatcher:
             pass
 
     def get_embedding(self, text: str) -> list[float]:
-        """Retrieves or calculates deterministic embedding vector with disk caching."""
-        cache_key = hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
+        """Retrieves or calculates fastembed embedding vector with disk caching.
+        Raises RuntimeError immediately if the model returns all zeros or an empty vector."""
+        clean_text = text.strip()
+        if not clean_text:
+            raise ValueError("Cannot embed empty text.")
+
+        cache_key = hashlib.sha256(clean_text.encode("utf-8")).hexdigest()
         if cache_key in self._disk_cache:
             return self._disk_cache[cache_key]
 
-        emb = _compute_deterministic_embedding(text)
-        self._disk_cache[cache_key] = emb
+        embeddings = list(self._embedder.embed([clean_text]))
+        if not embeddings:
+            raise RuntimeError(f"fastembed ({self.model_name}) produced empty embedding for '{clean_text[:40]}'")
+
+        vec = [float(x) for x in embeddings[0]]
+        if all(abs(x) < 1e-9 for x in vec):
+            raise RuntimeError(f"fastembed ({self.model_name}) returned all zeros for '{clean_text[:40]}' - silent fallback blocked.")
+
+        norm = math.sqrt(sum(x * x for x in vec))
+        if norm > 0.0:
+            vec = [x / norm for x in vec]
+        else:
+            raise RuntimeError(f"fastembed ({self.model_name}) returned vector with zero L2 norm for '{clean_text[:40]}'")
+
+        self._disk_cache[cache_key] = vec
         self._save_cache()
-        return emb
+        return vec
 
     def compute_keyword_score(self, query: str, document: str) -> float:
         """Computes keyword and technical synonym overlap score (0.0 to 1.0)."""
@@ -222,6 +238,7 @@ class HybridMatcher:
             keyword_score=kw,
             bm25_score=bm25,
             embedding_score=emb,
+            embedding_model=self.model_name,
         )
 
     def rank_candidates(self, query: str, candidate_texts: list[str]) -> list[tuple[int, MatchScore]]:

@@ -3,58 +3,178 @@
 {% block title %}ResumeProof | Claim Review & Grounding{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
+<!-- Top Header & Action Row -->
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem;">
   <div>
     <h1>Candidate Claim Verification</h1>
     <p class="subtitle" style="margin-bottom: 0;">Review parsed claims for User <code>{{ user_id }}</code>. Confirm claims to include in the technical interview audit.</p>
   </div>
-  <form action="/review/{{ user_id }}/start_interview" method="POST">
-    <input type="hidden" name="persona" value="{{ persona_id }}">
-    <button type="submit" class="btn btn-primary">Start Technical Interview &rarr;</button>
-  </form>
+  
+  <div style="display: flex; gap: 0.75rem; align-items: center;">
+    <form action="/review/{{ user_id }}/start_interview" method="POST" id="start-interview-form">
+      <input type="hidden" name="persona" value="{{ persona_id }}">
+      <button type="submit" id="btn-start-interview" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>Start Technical Interview</span>
+        <span id="interview-ready-badge" class="badge" style="background: rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem;">0 ready</span>
+        <span>&rarr;</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Live Review Progress Bar -->
+<div class="review-stats-bar">
+  <div class="review-stat-item">
+    <span id="stat-confirmed" class="review-stat-num" style="color: var(--success-text);">0</span>
+    <span class="review-stat-lbl">Confirmed</span>
+  </div>
+  <div class="review-stat-item">
+    <span id="stat-pending" class="review-stat-num" style="color: var(--warning-text);">0</span>
+    <span class="review-stat-lbl">Pending</span>
+  </div>
+  <div class="review-stat-item">
+    <span id="stat-rejected" class="review-stat-num" style="color: var(--danger-text);">0</span>
+    <span class="review-stat-lbl">Rejected</span>
+  </div>
+  <div class="review-stat-item">
+    <span id="stat-total" class="review-stat-num">{{ claims|length }}</span>
+    <span class="review-stat-lbl">Total</span>
+  </div>
+  
+  <div class="review-progress-track" title="Confirmation Progress">
+    <div id="stat-progress-fill" class="review-progress-fill" style="width: 0%;"></div>
+  </div>
+  
+  <div style="font-size: 0.85rem; font-weight: 600; color: #fff; min-width: 48px; text-align: right;" id="stat-percentage">
+    0%
+  </div>
 </div>
 
 <!-- Candidate Facts Overview -->
 {% if facts %}
-<div class="card" style="margin-bottom: 2rem;">
-  <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.75rem;">Extracted Profile Facts</div>
-  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+<div class="card" style="margin-bottom: 1.75rem; padding: 1.25rem 1.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">
+      Candidate Profile Facts ({{ facts|length }}) &mdash; Confirmed Individually
+    </div>
+    <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+      <span>●</span> Category 1: Explicit candidate review required
+    </span>
+  </div>
+
+  <div class="facts-grid">
     {% for f in facts %}
-    <span class="badge badge-neutral" title="Line {{ f.source_line }}">{{ f.fact_type.value }}: {{ f.value }}</span>
+    <div class="fact-card" id="fact-{{ f.id }}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+      <div>
+        <div class="fact-card-label">{{ f.fact_type.value.replace('_', ' ') }}</div>
+        <div class="fact-card-value">{{ f.value }}</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        {% if f.is_confirmed %}
+        <span class="badge badge-success" style="font-size: 0.7rem;">Confirmed</span>
+        <button 
+          class="btn btn-secondary btn-sm"
+          hx-post="/review/{{ user_id }}/reject_fact"
+          hx-vals='{"fact_id": "{{ f.id }}"}'
+          hx-target="#fact-{{ f.id }}"
+          hx-swap="outerHTML">
+          Undo
+        </button>
+        {% else %}
+        <span class="badge badge-neutral" style="font-size: 0.7rem;">Pending</span>
+        <button 
+          class="btn btn-success btn-sm"
+          hx-post="/review/{{ user_id }}/confirm_fact"
+          hx-vals='{"fact_id": "{{ f.id }}"}'
+          hx-target="#fact-{{ f.id }}"
+          hx-swap="outerHTML">
+          Confirm
+        </button>
+        {% endif %}
+      </div>
+    </div>
     {% endfor %}
   </div>
 </div>
 {% endif %}
 
-<!-- Claims Review Table -->
+<!-- Claims Review Toolbar & Table -->
 <div class="card" style="padding: 0; overflow: hidden;">
-  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center;">
-    <h2 style="margin: 0; font-size: 1.1rem;">Technical Claims ({{ claims|length }})</h2>
-    <span style="font-size: 0.85rem; color: var(--text-muted);">Confirm or reject items to tune the interview planner</span>
+  <!-- Toolbar: Bulk Actions + Search -->
+  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2 style="margin: 0 0 0.25rem 0; font-size: 1.15rem;">Technical Claims (<span id="visible-claims-count">{{ claims|length }}</span>)</h2>
+      <div style="font-size: 0.82rem; color: var(--text-muted);">Confirm or reject items to tune the interview planner</div>
+    </div>
+
+    <!-- Bulk Action Controls -->
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <form action="/review/{{ user_id }}/confirm_all" method="POST" style="margin: 0;">
+        <input type="hidden" name="persona" value="{{ persona_id }}">
+        <button type="submit" class="btn btn-success btn-sm" title="Confirm all extracted claims in one click">
+          ✓ Confirm All
+        </button>
+      </form>
+
+      <form action="/review/{{ user_id }}/reject_all" method="POST" style="margin: 0;">
+        <input type="hidden" name="persona" value="{{ persona_id }}">
+        <button type="submit" class="btn btn-danger btn-sm" title="Reject all claims">
+          ✕ Reject All
+        </button>
+      </form>
+
+      <form action="/review/{{ user_id }}/reset_all" method="POST" style="margin: 0;">
+        <input type="hidden" name="persona" value="{{ persona_id }}">
+        <button type="submit" class="btn btn-secondary btn-sm" title="Reset all review states to pending">
+          ↺ Reset All
+        </button>
+      </form>
+    </div>
   </div>
 
+  <!-- Filter Pills Bar & Instant Search -->
+  <div style="padding: 0.85rem 1.5rem; background: rgba(255, 255, 255, 0.015); border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+    <div class="filter-pills" id="filter-pills">
+      <div class="filter-pill active" onclick="applyFilter('all', this)">All ({{ claims|length }})</div>
+      <div class="filter-pill" onclick="applyFilter('project_metric', this)">Project Bullets</div>
+      <div class="filter-pill" onclick="applyFilter('tool', this)">Stack Tools</div>
+      <div class="filter-pill" onclick="applyFilter('skill', this)">Skills</div>
+      <div class="filter-pill" onclick="applyFilter('experience_claim', this)">Experience</div>
+      <div class="filter-pill" onclick="applyFilter('achievement', this)">Achievements</div>
+      <div class="filter-pill" style="border-left: 1px solid rgba(255,255,255,0.15); margin-left: 0.25rem;" onclick="applyFilter('status-pending', this)">Pending</div>
+      <div class="filter-pill" onclick="applyFilter('status-confirmed', this)">Confirmed</div>
+      <div class="filter-pill" onclick="applyFilter('status-rejected', this)">Rejected</div>
+    </div>
+
+    <!-- Live Search Input -->
+    <div>
+      <input type="text" id="claim-search" class="search-box" placeholder="Search claims or tools..." oninput="handleSearch(this.value)">
+    </div>
+  </div>
+
+  <!-- Table of Claims -->
   <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
-    <table>
+    <table id="claims-table">
       <thead>
         <tr>
-          <th style="width: 140px;">Type</th>
+          <th style="width: 150px;">Type & Project</th>
           <th>Claim Statement</th>
-          <th style="width: 180px;">Tools & Metrics</th>
+          <th style="width: 200px;">Tools & Metrics</th>
           <th style="width: 120px;">Status</th>
           <th style="width: 160px; text-align: right;">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for c in claims %}
-        <tr id="claim-{{ c.id }}">
+        <tr id="claim-{{ c.id }}" data-id="{{ c.id }}" data-type="{{ c.claim_type.value }}" data-project="{{ c.project_id or '' }}" data-status="{{ c.status.value }}">
           <td>
             <span class="badge badge-neutral">{{ c.claim_type.value }}</span>
             {% if c.project_id %}
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{{ c.project_id }}</code></div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;"><code>{{ c.project_id }}</code></div>
             {% endif %}
           </td>
           <td>
-            <div style="color: #fff; font-weight: 500;">{{ c.text }}</div>
+            <div class="claim-text" style="color: #fff; font-weight: 500; line-height: 1.45;">{{ c.text }}</div>
             {% if c.source_line %}
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Source line: {{ c.source_line }}</div>
             {% endif %}
@@ -104,4 +224,104 @@
     </table>
   </div>
 </div>
+
+<script>
+  let currentFilter = 'all';
+  let currentSearch = '';
+
+  function updateReviewStats() {
+    const rows = document.querySelectorAll('#claims-table tbody tr');
+    let confirmed = 0;
+    let rejected = 0;
+    let pending = 0;
+
+    rows.forEach(row => {
+      const status = row.getAttribute('data-status');
+      if (status === 'confirmed') confirmed++;
+      else if (status === 'rejected') rejected++;
+      else pending++;
+    });
+
+    const total = rows.length;
+    const percentage = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+
+    document.getElementById('stat-confirmed').textContent = confirmed;
+    document.getElementById('stat-pending').textContent = pending;
+    document.getElementById('stat-rejected').textContent = rejected;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-percentage').textContent = `${percentage}%`;
+    document.getElementById('stat-progress-fill').style.width = `${percentage}%`;
+
+    const badge = document.getElementById('interview-ready-badge');
+    if (badge) {
+      badge.textContent = `${confirmed} ready`;
+      if (confirmed > 0) {
+        badge.style.background = 'var(--success-text)';
+        badge.style.color = '#09090b';
+        badge.style.fontWeight = '700';
+      } else {
+        badge.style.background = 'rgba(255,255,255,0.2)';
+        badge.style.color = '#fff';
+      }
+    }
+  }
+
+  function applyFilter(filterType, element) {
+    currentFilter = filterType;
+    document.querySelectorAll('#filter-pills .filter-pill').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+    filterTable();
+  }
+
+  function handleSearch(query) {
+    currentSearch = query.trim().toLowerCase();
+    filterTable();
+  }
+
+  function filterTable() {
+    const rows = document.querySelectorAll('#claims-table tbody tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const type = row.getAttribute('data-type') || '';
+      const status = row.getAttribute('data-status') || '';
+      const text = row.textContent.toLowerCase();
+
+      let matchesFilter = false;
+      if (currentFilter === 'all') {
+        matchesFilter = true;
+      } else if (currentFilter.startsWith('status-')) {
+        const targetStatus = currentFilter.replace('status-', '');
+        matchesFilter = (status === targetStatus);
+      } else {
+        matchesFilter = (type === currentFilter);
+      }
+
+      let matchesSearch = true;
+      if (currentSearch.length > 0) {
+        matchesSearch = text.includes(currentSearch);
+      }
+
+      if (matchesFilter && matchesSearch) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    const counter = document.getElementById('visible-claims-count');
+    if (counter) counter.textContent = visibleCount;
+  }
+
+  // Update stats on load and on any HTMX swap
+  document.addEventListener('DOMContentLoaded', () => {
+    updateReviewStats();
+  });
+
+  document.body.addEventListener('htmx:afterSwap', (e) => {
+    updateReviewStats();
+    filterTable();
+  });
+</script>
 {% endblock %}

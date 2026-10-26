@@ -1,0 +1,414 @@
+{
+  "machine": "AMD Ryzen 7 7735HS (8C/16T) | NVIDIA GeForce RTX 4050 Laptop GPU (6GB VRAM) | 16GB DDR5",
+  "date": "2026-10-26",
+  "cold_start_7b_ms": 11997.14,
+  "model_switch_3b_ms": 14506.93,
+  "records_7b_uncached": [
+    {
+      "call_index": 1,
+      "timestamp": "2026-10-26T06:42:06.800200+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1077,
+      "output_tokens": 142,
+      "total_ms": 9112.95,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 2,
+      "timestamp": "2026-10-26T06:42:14.358279+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1001,
+      "output_tokens": 116,
+      "total_ms": 7558.06,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 3,
+      "timestamp": "2026-10-26T06:42:24.136678+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1083,
+      "output_tokens": 142,
+      "total_ms": 9778.09,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 4,
+      "timestamp": "2026-10-26T06:42:33.992335+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1148,
+      "output_tokens": 143,
+      "total_ms": 9855.77,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 5,
+      "timestamp": "2026-10-26T06:42:42.840070+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1111,
+      "output_tokens": 132,
+      "total_ms": 8847.63,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 6,
+      "timestamp": "2026-10-26T06:42:58.664450+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1173,
+      "output_tokens": 233,
+      "total_ms": 15824.27,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 7,
+      "timestamp": "2026-10-26T06:43:11.267712+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1081,
+      "output_tokens": 185,
+      "total_ms": 12603.22,
+      "cache_hit": "No",
+      "score": 2
+    },
+    {
+      "call_index": 8,
+      "timestamp": "2026-10-26T06:43:20.454608+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1088,
+      "output_tokens": 133,
+      "total_ms": 9186.56,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 9,
+      "timestamp": "2026-10-26T06:43:31.076331+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1064,
+      "output_tokens": 152,
+      "total_ms": 10621.71,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 10,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 1098,
+      "output_tokens": 288,
+      "total_ms": 19239.15,
+      "cache_hit": "No",
+      "score": 2
+    }
+  ],
+  "records_7b_cached": [
+    {
+      "call_index": 1,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.029,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 2,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.015,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 3,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.014,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 4,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.01,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 5,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.008,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 6,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.008,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 7,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.008,
+      "cache_hit": "Yes",
+      "score": 2
+    },
+    {
+      "call_index": 8,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.017,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 9,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.01,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 10,
+      "timestamp": "2026-10-26T06:43:50.315864+00:00",
+      "model": "qwen2.5:7b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.009,
+      "cache_hit": "Yes",
+      "score": 2
+    }
+  ],
+  "records_3b_uncached": [
+    {
+      "call_index": 1,
+      "timestamp": "2026-10-26T06:44:08.876250+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1077,
+      "output_tokens": 114,
+      "total_ms": 4053.03,
+      "cache_hit": "No",
+      "score": 1
+    },
+    {
+      "call_index": 2,
+      "timestamp": "2026-10-26T06:44:13.132400+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1001,
+      "output_tokens": 119,
+      "total_ms": 4256.14,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 3,
+      "timestamp": "2026-10-26T06:44:20.576426+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1083,
+      "output_tokens": 199,
+      "total_ms": 7443.88,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 4,
+      "timestamp": "2026-10-26T06:44:26.167467+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1148,
+      "output_tokens": 143,
+      "total_ms": 5590.65,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 5,
+      "timestamp": "2026-10-26T06:44:31.418278+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1111,
+      "output_tokens": 132,
+      "total_ms": 5250.51,
+      "cache_hit": "No",
+      "score": 2
+    },
+    {
+      "call_index": 6,
+      "timestamp": "2026-10-26T06:44:36.538265+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1173,
+      "output_tokens": 144,
+      "total_ms": 5120.09,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 7,
+      "timestamp": "2026-10-26T06:44:43.010106+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1081,
+      "output_tokens": 170,
+      "total_ms": 6471.53,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 8,
+      "timestamp": "2026-10-26T06:44:47.447448+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1088,
+      "output_tokens": 122,
+      "total_ms": 4437.48,
+      "cache_hit": "No",
+      "score": 2
+    },
+    {
+      "call_index": 9,
+      "timestamp": "2026-10-26T06:44:53.033744+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1064,
+      "output_tokens": 158,
+      "total_ms": 5585.69,
+      "cache_hit": "No",
+      "score": 4
+    },
+    {
+      "call_index": 10,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 1098,
+      "output_tokens": 135,
+      "total_ms": 5443.66,
+      "cache_hit": "No",
+      "score": 4
+    }
+  ],
+  "records_3b_cached": [
+    {
+      "call_index": 1,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.119,
+      "cache_hit": "Yes",
+      "score": 1
+    },
+    {
+      "call_index": 2,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.027,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 3,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.012,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 4,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.011,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 5,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.009,
+      "cache_hit": "Yes",
+      "score": 2
+    },
+    {
+      "call_index": 6,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.017,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 7,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.01,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 8,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.01,
+      "cache_hit": "Yes",
+      "score": 2
+    },
+    {
+      "call_index": 9,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.008,
+      "cache_hit": "Yes",
+      "score": 4
+    },
+    {
+      "call_index": 10,
+      "timestamp": "2026-10-26T06:44:58.477604+00:00",
+      "model": "qwen2.5:3b",
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "total_ms": 0.008,
+      "cache_hit": "Yes",
+      "score": 4
+    }
+  ]
+}

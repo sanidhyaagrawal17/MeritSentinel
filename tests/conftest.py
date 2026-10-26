@@ -3,6 +3,7 @@
 import pytest
 from resumeproof.core.db import Database
 from resumeproof.core.llm import FakeLLMClient
+from tests.fixtures.demo_fixtures import DEMO_FIXTURES
 from resumeproof.store.claim_store import ClaimStore
 from resumeproof.review.flow import ReviewSession
 
@@ -28,4 +29,4 @@ def review_session(claim_store):
 @pytest.fixture
 def fake_llm():
     """Deterministic offline FakeLLMClient."""
-    return FakeLLMClient()
+    return FakeLLMClient(recorded_fixtures=DEMO_FIXTURES)

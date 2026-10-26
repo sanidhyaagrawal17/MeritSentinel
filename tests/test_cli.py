@@ -2,6 +2,8 @@
 
 from click.testing import CliRunner
 from resumeproof.cli.main import cli
+from resumeproof.core.llm import FakeLLMClient
+from tests.fixtures.demo_fixtures import DEMO_FIXTURES
 from pathlib import Path
 
 DEMO_DIR = Path("data/demo")
@@ -9,6 +11,7 @@ DEMO_DIR = Path("data/demo")
 def test_cli_extract_auto_confirm(tmp_path, monkeypatch):
     test_db = tmp_path / "cli_test.db"
     monkeypatch.setenv("RESUMEPROOF_DB_PATH", str(test_db))
+    monkeypatch.setattr("resumeproof.cli.main.FakeLLMClient", lambda: FakeLLMClient(recorded_fixtures=DEMO_FIXTURES))
 
     runner = CliRunner()
     result = runner.invoke(cli, [
@@ -27,6 +30,7 @@ def test_cli_extract_auto_confirm(tmp_path, monkeypatch):
 def test_cli_extract_interactive_confirm_and_edit(tmp_path, monkeypatch):
     test_db = tmp_path / "cli_interactive.db"
     monkeypatch.setenv("RESUMEPROOF_DB_PATH", str(test_db))
+    monkeypatch.setattr("resumeproof.cli.main.FakeLLMClient", lambda: FakeLLMClient(recorded_fixtures=DEMO_FIXTURES))
 
     runner = CliRunner()
     # Provide inputs for facts and claims:

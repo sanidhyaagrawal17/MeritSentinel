@@ -65,3 +65,23 @@ def test_rank_candidates(tmp_path: Path):
     top_idx, top_score = ranked[0]
     assert top_idx == 1  # Raft candidate
     assert top_score.total > ranked[1][1].total
+
+
+def test_matcher_embedding_model_pinned_and_zero_fallback_fails(tmp_path: Path):
+    """Verifies that fastembed is pinned to sentence-transformers/all-MiniLM-L6-v2,
+    records the model name in every MatchScore output, and fails loudly if embeddings return zeros."""
+    from unittest.mock import patch
+    matcher = HybridMatcher(cache_dir=tmp_path / "cache")
+    assert matcher.model_name == "sentence-transformers/all-MiniLM-L6-v2"
+
+    score = matcher.match("FastAPI backend", "Engineered REST APIs with FastAPI", bm25_normalized_score=0.5)
+    assert score.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
+    assert "embedding_model" in score.as_dict()
+    assert score.as_dict()["embedding_model"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert score.embedding_score > 0.4
+
+    # Test that returning all zeros raises RuntimeError immediately (never silent fallback)
+    with patch.object(matcher._embedder, "embed", return_value=[[0.0] * 384]):
+        matcher._disk_cache.clear()
+        with pytest.raises(RuntimeError, match="returned all zeros"):
+            matcher.get_embedding("Forced zero embedding text")

@@ -93,6 +93,37 @@ class ClaimStore:
                 (user_correction, datetime.now(timezone.utc).isoformat(), fact_id)
             )
 
+    def reject_profile_fact(self, fact_id: str) -> None:
+        with self.db.transaction() as conn:
+            conn.execute(
+                """
+                UPDATE profile_facts
+                SET is_confirmed = 0,
+                    confirmed_at = NULL
+                WHERE id = ?
+                """,
+                (fact_id,)
+            )
+
+    def get_profile_fact(self, fact_id: str) -> Optional[ProfileFact]:
+        with self.db.transaction() as conn:
+            r = conn.execute("SELECT * FROM profile_facts WHERE id = ?", (fact_id,)).fetchone()
+            if not r:
+                return None
+            return ProfileFact(
+                id=r["id"],
+                user_id=r["user_id"],
+                persona_id=r["persona_id"],
+                fact_type=ProfileFactType(r["fact_type"]),
+                value=r["value"],
+                source_line=r["source_line"],
+                source_page=r["source_page"],
+                is_confirmed=bool(r["is_confirmed"]),
+                user_correction=r["user_correction"],
+                confirmed_at=datetime.fromisoformat(r["confirmed_at"]) if r["confirmed_at"] else None,
+                created_at=datetime.fromisoformat(r["created_at"])
+            )
+
     def get_profile_facts(self, user_id: str, only_confirmed: bool = False) -> list[ProfileFact]:
         query = "SELECT * FROM profile_facts WHERE user_id = ?"
         if only_confirmed:
@@ -117,6 +148,28 @@ class ClaimStore:
                 created_at=datetime.fromisoformat(r["created_at"])
             ))
         return facts
+
+    def clear_user_data(self, user_id: str) -> None:
+        """Clears unconfirmed extracted claims, their audits, and unconfirmed profile facts.
+        Never deletes confirmed claims, edited claims, interview answers, or mastery history."""
+        with self.db.transaction() as conn:
+            conn.execute(
+                """
+                DELETE FROM claim_audits
+                WHERE claim_id IN (
+                    SELECT id FROM claims WHERE user_id = ? AND status = 'extracted'
+                )
+                """,
+                (user_id,)
+            )
+            conn.execute(
+                "DELETE FROM claims WHERE user_id = ? AND status = 'extracted'",
+                (user_id,)
+            )
+            conn.execute(
+                "DELETE FROM profile_facts WHERE user_id = ? AND is_confirmed = 0",
+                (user_id,)
+            )
 
     # ---------------- Mastery Claims (Category 2: Interview-gated) ----------------
 
@@ -237,6 +290,54 @@ class ClaimStore:
                     datetime.now(timezone.utc).isoformat(),
                     notes
                 )
+            )
+
+    def bulk_update_claims(
+        self,
+        user_id: str,
+        action: ClaimStatus,
+        claim_ids: Optional[list[str]] = None,
+    ) -> int:
+        """Bulk updates claims for a user to confirmed, rejected, or pending."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.transaction() as conn:
+            if claim_ids:
+                placeholders = ",".join("?" for _ in claim_ids)
+                params = [action.value, user_id] + claim_ids
+                cursor = conn.execute(
+                    f"UPDATE claims SET status = ? WHERE user_id = ? AND id IN ({placeholders})",
+                    params
+                )
+                conn.execute(
+                    f"""
+                    UPDATE claim_audits 
+                    SET action_taken = ?, reviewed_at = ?
+                    WHERE claim_id IN (SELECT id FROM claims WHERE user_id = ? AND id IN ({placeholders}))
+                    """,
+                    [action.value, now, user_id] + claim_ids
+                )
+            else:
+                cursor = conn.execute(
+                    "UPDATE claims SET status = ? WHERE user_id = ?",
+                    (action.value, user_id)
+                )
+                conn.execute(
+                    """
+                    UPDATE claim_audits 
+                    SET action_taken = ?, reviewed_at = ?
+                    WHERE claim_id IN (SELECT id FROM claims WHERE user_id = ?)
+                    """,
+                    (action.value, now, user_id)
+                )
+            return cursor.rowcount
+
+    def confirm_all_facts(self, user_id: str) -> None:
+        """Confirms all profile facts for a user."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE profile_facts SET is_confirmed = 1, confirmed_at = ? WHERE user_id = ?",
+                (now, user_id)
             )
 
     def get_claim(self, claim_id: str) -> Optional[Claim]:

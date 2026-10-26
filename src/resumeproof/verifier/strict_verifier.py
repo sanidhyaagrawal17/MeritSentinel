@@ -9,18 +9,41 @@ from resumeproof.schemas.facts import ProfileFact, ProfileFactType
 from resumeproof.verifier.injection import (
     normalize_unicode_homoglyphs,
     normalize_words_to_numbers,
+    AdversarialDetector,
 )
 
 # Known technical tools and languages for word-boundary matching
 KNOWN_TOOLS = [
     "C++", "C#", "C", "Java", "JavaScript", "TypeScript", "Python", "Go", "Golang",
-    "Rust", "Kotlin", "Swift", "Scala", "PHP", "Ruby", "Perl", "Lua", "SQL",
+    "Rust", "Kotlin", "Swift", "Scala", "PHP", "Ruby", "Perl", "Lua", "SQL", "Haskell",
     "FastAPI", "Flask", "Django", "Spring", "Node.js", "Express", "React",
-    "PostgreSQL", "MySQL", "SQLite", "DuckDB", "Redis", "MongoDB", "Cassandra",
-    "Kafka", "RabbitMQ", "Raft", "Paxos", "Docker", "Kubernetes", "Istio",
-    "AWS", "GCP", "Azure", "Linux", "POSIX", "gRPC", "Protobuf", "ONNX",
+    "PostgreSQL", "MySQL", "SQLite", "DuckDB", "Redis", "MongoDB",
+    "Kafka", "Raft", "Paxos", "Docker", "Kubernetes", "Istio",
+    "AWS", "AWS EC2", "GCP", "Azure", "Linux", "POSIX", "gRPC", "Protobuf", "ONNX",
     "LightGBM", "PyTorch", "TensorFlow", "Scikit-Learn", "Jepsen", "Locust",
+    "ONNX Runtime", "Ultralytics YOLO11", "YOLO11", "NetworkX", "Cisco Meraki API",
+    "JWT", "JSON-RPC 2.0", "JSON-RPC", "Model Context Protocol", "MCP",
+    "ChromaDB", "Next.js", "Next.js 14", "Pydantic", "Postman", "Git", "GitHub",
+    "Apache Spark", "Spark", "Databricks", "Snowflake", "BigQuery",
+    "Jenkins", "Milvus", "TensorRT", "BGP", "CUDA", "Google Antigravity (Gemini)", "Google Antigravity", "Gemini",
 ]
+
+TOOL_ALIASES: dict[str, list[str]] = {
+    "mcp": ["model context protocol"],
+    "model context protocol": ["mcp"],
+    "yolo11": ["ultralytics yolo11"],
+    "ultralytics yolo11": ["yolo11"],
+    "next.js": ["next.js 14"],
+    "next.js 14": ["next.js"],
+    "json-rpc": ["json-rpc 2.0"],
+    "json-rpc 2.0": ["json-rpc"],
+    "rest": ["restful apis", "rest api", "rest apis"],
+    "restful apis": ["rest", "rest api", "rest apis"],
+    "rag": ["retrieval-augmented generation", "retrieval-augmented generation (rag)"],
+    "retrieval-augmented generation (rag)": ["rag"],
+    "google antigravity": ["google antigravity (gemini)"],
+    "google antigravity (gemini)": ["google antigravity"],
+}
 
 # Regex for word boundary matching, handling special characters like ++ and #
 def build_tool_pattern(tool: str) -> re.Pattern:
@@ -78,7 +101,11 @@ def normalize_number_string(val: str) -> str:
 
 def extract_numbers_and_metrics(text: str) -> list[str]:
     """Extracts numbers, percentages, latencies, and metrics from text."""
-    # Find numbers with units like ms, req/sec, %, or standalone numbers
+    # Mask numbers that are part of known tool names (e.g. JSON-RPC 2.0, Next.js 14, YOLO11)
+    masked_text = text
+    for tool_with_digit in ["JSON-RPC 2.0", "Next.js 14", "Ultralytics YOLO11", "YOLO11", "HTTP/2", "HTTP/3", "OAuth 2.0"]:
+        masked_text = re.sub(re.escape(tool_with_digit), " " * len(tool_with_digit), masked_text, flags=re.IGNORECASE)
+
     patterns = [
         r"\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:req/sec|reqs/sec|requests/sec|rps|qps)\b",
         r"\b\d+(?:\.\d+)?\s*%",
@@ -88,7 +115,7 @@ def extract_numbers_and_metrics(text: str) -> list[str]:
     matches = []
     seen_spans = set()
     for p in patterns:
-        for m in re.finditer(p, text, re.IGNORECASE):
+        for m in re.finditer(p, masked_text, re.IGNORECASE):
             span = m.span()
             if not any(span[0] >= s[0] and span[1] <= s[1] for s in seen_spans):
                 seen_spans.add(span)
@@ -98,18 +125,140 @@ def extract_numbers_and_metrics(text: str) -> list[str]:
 
 
 def extract_tools_from_text(text: str) -> list[str]:
-    """Extracts known technical tools using strict word-boundary matching."""
-    tools = []
-    for tool_name, reg in TOOL_REGEX_MAP.items():
-        if reg.search(text):
-            # Special check: ensure Java is not matched in JavaScript
-            if tool_name.lower() == "java" and re.search(r"\bjavascript\b", text, re.IGNORECASE):
-                # Check if java appears outside javascript
-                cleaned = re.sub(r"\bjavascript\b", "", text, flags=re.IGNORECASE)
-                if not reg.search(cleaned):
-                    continue
-            tools.append(tool_name)
-    return tools
+    """Extracts known technical tools using longest-match span subsumption to prevent root subtoken leakage."""
+    extracted = []
+    occupied_spans: list[tuple[int, int]] = []
+
+    # Sort tools by length descending so longer composite names claim spans first
+    sorted_tools = sorted(KNOWN_TOOLS, key=len, reverse=True)
+
+    for tool_name in sorted_tools:
+        reg = TOOL_REGEX_MAP[tool_name]
+        for m in reg.finditer(text):
+            span = m.span()
+            # If this match is subsumed by an already matched longer tool span, skip
+            if any(span[0] >= occ[0] and span[1] <= occ[1] for occ in occupied_spans):
+                continue
+            occupied_spans.append(span)
+            if tool_name not in extracted:
+                extracted.append(tool_name)
+
+    return extracted
+
+
+COMMON_RESUME_WORDS = {
+    # Pronouns, Prepositions, Conjunctions
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "with", "from", "by", "of", "as",
+    "into", "through", "across", "under", "over", "between", "after", "before", "while", "during", "using",
+    "via", "we", "our", "i", "my", "this", "that", "these", "those", "both", "all", "each", "every",
+    # Resume Action Verbs
+    "built", "engineered", "designed", "trained", "benchmarked", "exported", "configured", "architected",
+    "deployed", "developed", "implemented", "achieved", "optimized", "evaluated", "parsed", "resolved",
+    "maintained", "conducted", "applied", "generated", "integrated", "executed", "sustained", "profiled",
+    "scaled", "partitioned", "monitored", "delivered", "authored", "created", "spearheaded", "collaborated",
+    "tested", "verified", "automated", "retained", "attained", "demonstrated", "served", "handled", "reached",
+    "clocked", "dropped", "gained", "tuned", "reverted", "switched", "introduced", "structured", "streamlined",
+    "processed", "dispatched", "scraped", "persisted", "modeled", "queried", "decoupled", "constructed",
+    "managed", "secured", "indexed", "isolated", "adhering", "unpacking", "decoding", "following",
+    # Resume Section & Fact Nouns
+    "bachelor", "master", "doctor", "science", "engineering", "technology", "university", "college",
+    "school", "institute", "india", "expected", "june", "july", "august", "september", "october",
+    "november", "december", "january", "february", "march", "april", "may", "cgpa", "gpa", "degree",
+    "education", "experience", "projects", "skills", "summary", "profile", "overview", "work", "history",
+    # Standard Technical Concepts / English Words (NOT specific unverified tool/framework packages)
+    "computer", "technical", "systems", "system", "service", "services", "backend", "frontend", "fullstack",
+    "pipeline", "pipelines", "dataset", "datasets", "benchmark", "benchmarks", "surface", "defect", "defects",
+    "detection", "model", "models", "architecture", "architectures", "variant", "variants", "baseline",
+    "baselines", "feature", "features", "layer", "layers", "network", "networks", "protocol", "protocols",
+    "format", "formats", "specification", "specifications", "spec", "specs", "mode", "modes", "database",
+    "databases", "connection", "connections", "pool", "pools", "pooling", "query", "queries", "header",
+    "headers", "record", "records", "traffic", "packet", "packets", "socket", "sockets", "rule", "rules",
+    "state", "states", "status", "index", "indices", "indexing", "search", "tool", "tools", "metric",
+    "metrics", "score", "scores", "split", "splits", "train", "training", "validation", "test", "testing",
+    "single", "multi", "high", "low", "real", "time", "level", "cloud", "web", "full", "core", "code",
+    "data", "line", "lines", "bullet", "bullets", "node", "nodes", "cluster", "clusters", "instance",
+    "instances", "client", "clients", "server", "servers", "api", "apis", "rest", "restful", "endpoint",
+    "endpoints", "app", "apps", "application", "applications", "module", "modules", "script", "scripts",
+    "throughput", "latency", "inference", "execution", "rate", "limit", "limiter", "limiting", "window",
+    "sliding", "fixed", "token", "bucket", "leaky", "algorithm", "algorithms", "structure", "structures",
+    "binary", "hex", "byte", "bytes", "octet", "octets", "bitwise", "memory", "storage", "disk", "file",
+    "files", "directory", "directories", "log", "logs", "logging", "journal", "journaling", "lock", "locks",
+    "locking", "concurrency", "concurrent", "thread", "threads", "process", "processes", "async", "sync",
+    "synchronous", "asynchronous", "event", "events", "loop", "queue", "queues", "message", "messages",
+    "worker", "workers", "task", "tasks", "tracker", "tracking", "flow", "workflow", "workflows", "job",
+    "jobs", "batch", "stream", "streaming", "load", "balancer", "balancing", "proxy", "reverse", "gateway",
+    "route", "routes", "routing", "router", "routers", "sniffer", "sniffing", "capture", "capturing",
+    "filter", "filtering", "nat", "vlan", "subnet", "subnetting", "ip", "ipv4", "ipv6", "tcp", "udp",
+    "icmp", "arp", "dns", "dhcp", "http", "https", "ssl", "tls", "raw", "checksum", "crc",
+    "payload", "segment", "datagram", "frame", "frames", "bit", "bits", "flag", "flags", "ack", "syn",
+    "fin", "rst", "psh", "urg", "ttl", "tos", "mac", "address", "addresses", "resolution",
+    "resolver", "recursive", "iterative", "authoritative", "root", "tld", "domain", "nameserver", "lookup",
+    "lookups", "forward", "zone", "zones", "rr", "cname", "txt", "mx", "soa", "ptr", "srv", "ns",
+    "wire", "unpacking", "packing", "struct", "decode", "decoder", "decoding", "encode", "encoder",
+    "encoding", "parser", "parsers", "parsing", "ast", "tree", "graph", "graphs", "entity", "relationships",
+    "relational", "columnar", "distributed", "serverless", "reproducible", "fleet", "broker", "brokers",
+    "exchanges", "queuing", "depth", "canary", "continuous", "delivery", "gitops", "declarative",
+    "technologies", "rendered", "validated", "provisioned", "orchestrated", "wi", "fi", "acid", "compliant",
+    "retrieval", "augmented", "generation", "embeddings", "semantic",
+}
+
+def extract_unbacked_technical_terms(
+    sentence: str,
+    eligible_claims: list[Claim],
+    confirmed_facts: list[ProfileFact],
+) -> list[str]:
+    """Detects unbacked technical tools, packages, and frameworks outside KNOWN_TOOLS.
+    Removes the closed-world assumption by identifying capitalized technical tokens,
+    camelCase/PascalCase words, or specific CLI/package names that do not match
+    standard resume English vocabulary and are not grounded in any eligible claim or confirmed fact.
+    """
+    import re
+    allowed_tokens = set()
+    for c in eligible_claims:
+        allowed_tokens.update(re.findall(r"[a-zA-Z0-9]+", c.text.lower()))
+        for t in c.tools:
+            allowed_tokens.update(re.findall(r"[a-zA-Z0-9]+", t.lower()))
+        if c.project_id:
+            allowed_tokens.update(re.findall(r"[a-zA-Z0-9]+", c.project_id.lower()))
+    for f in confirmed_facts:
+        allowed_tokens.update(re.findall(r"[a-zA-Z0-9]+", f.value.lower()))
+
+    # Known candidate tools outside KNOWN_TOOLS (e.g. Terraform, Ansible, Celery, Airflow, dbt, Flink, Cassandra, Neo4j, etc.)
+    CANDIDATE_OUTSIDE_TOOLS = [
+        "terraform", "ansible", "celery", "airflow", "dbt", "flink", "cassandra", "neo4j",
+        "rabbitmq", "prometheus", "grafana", "consul", "vault", "elasticsearch", "opensearch",
+        "keda", "spinnaker", "argocd", "supabase", "clickhouse",
+    ]
+
+    unbacked = []
+    
+    # 1. Match specific outside tools
+    for tool_token in CANDIDATE_OUTSIDE_TOOLS:
+        m = re.search(rf"\b{re.escape(tool_token)}\b", sentence, re.IGNORECASE)
+        if m:
+            matched_text = sentence[m.start():m.end()]
+            if tool_token.lower() not in allowed_tokens and matched_text not in unbacked:
+                unbacked.append(matched_text)
+
+    # 2. Match general PascalCase/CamelCase/Capitalized technical tokens
+    tokens = re.findall(r"\b[A-Za-z0-9_-]+\b", sentence)
+    for tok in tokens:
+        tl = tok.lower()
+        if len(tok) < 3:
+            continue
+        if tl in allowed_tokens or tl in COMMON_RESUME_WORDS:
+            continue
+        # If token contains hyphens, check if all subparts are allowed
+        if "-" in tok:
+            subparts = [p.lower() for p in tok.split("-") if p]
+            if all(sp in allowed_tokens or sp in COMMON_RESUME_WORDS for sp in subparts):
+                continue
+        # Capitalized token or PascalCase
+        if tok[0].isupper() and (any(c.isupper() for c in tok[1:]) or tl not in COMMON_RESUME_WORDS):
+            if tok not in unbacked:
+                unbacked.append(tok)
+
+    return unbacked
 
 
 class StrictVerifier:
@@ -117,6 +266,7 @@ class StrictVerifier:
 
     def __init__(self, allow_unverified_profile_headers: bool = True):
         self.allow_headers = allow_unverified_profile_headers
+        self.adversarial_detector = AdversarialDetector()
 
     def split_into_sentences(self, text: str) -> list[str]:
         """Splits resume text or markdown into logical bullet points and sentences."""
@@ -152,6 +302,18 @@ class StrictVerifier:
         sentence_idx: int = 1,
     ) -> SentenceVerificationResult:
         """Deterministically verifies a single sentence against backing claims and facts."""
+        # 0. Check for adversarial injection or homoglyph evasion
+        is_adv, adv_reasons = self.adversarial_detector.inspect(sentence)
+        if is_adv:
+            return SentenceVerificationResult(
+                sentence_idx=sentence_idx,
+                sentence_text=sentence,
+                status="BLOCKED",
+                supporting_claim_id=None,
+                extracted_entities={},
+                blocking_reasons=adv_reasons,
+            )
+
         reasons: list[str] = []
         normalized_sentence = normalize_words_to_numbers(sentence)
 
@@ -188,15 +350,55 @@ class StrictVerifier:
                         )
 
         # 2. Check if sentence matches confirmed profile facts (e.g. contact, degree, GPA)
+        matching_fact: Optional[ProfileFact] = None
         for f in confirmed_facts:
             f_norm = normalize_number_string(f.value)
             if f.value.lower() in sentence.lower() or f_norm in normalized_sentence.lower():
+                matching_fact = f
+                break
+
+        if matching_fact:
+            # When matching a profile fact, verify that the sentence does not introduce
+            # conflicting numbers (e.g. fabricated CGPA, inflated dates) or ungrounded metrics
+            sent_numbers = extract_numbers_and_metrics(normalized_sentence)
+            if sent_numbers:
+                valid_numbers = set()
+                for cf in confirmed_facts:
+                    for n in extract_numbers_and_metrics(normalize_words_to_numbers(cf.value)):
+                        valid_numbers.add(n)
+                    valid_numbers.add(normalize_number_string(cf.value))
+                for c in eligible_claims:
+                    for n in extract_numbers_and_metrics(normalize_words_to_numbers(f"{c.text} {' '.join(c.metric_values)}")):
+                        valid_numbers.add(n)
+
+                # Check specifically for contradictory CGPA
+                cgpa_match = re.search(r"\b(?:cgpa|gpa)\s*[:=]?\s*(\d+(?:\.\d+)?)\b", sentence, re.IGNORECASE)
+                if cgpa_match:
+                    cgpa_val = cgpa_match.group(1)
+                    confirmed_cgpa = next((cf.value for cf in confirmed_facts if cf.fact_type == ProfileFactType.CGPA), None)
+                    if confirmed_cgpa and cgpa_val not in confirmed_cgpa:
+                        reasons.append(f"Unbacked or conflicting CGPA: '{cgpa_val}' does not match confirmed CGPA '{confirmed_cgpa}'.")
+
+                for num in sent_numbers:
+                    if num not in valid_numbers and not any(num in vn for vn in valid_numbers):
+                        reasons.append(f"Unbacked or derived/rounded number: '{num}' does not match verified profile facts or claims.")
+
+            if not reasons:
                 return SentenceVerificationResult(
                     sentence_idx=sentence_idx,
                     sentence_text=sentence,
                     status="VERIFIED",
-                    supporting_claim_id=f"fact:{f.fact_type.value}",
-                    extracted_entities={"fact_type": f.fact_type.value, "fact_value": f.value},
+                    supporting_claim_id=f"fact:{matching_fact.fact_type.value}",
+                    extracted_entities={"fact_type": matching_fact.fact_type.value, "fact_value": matching_fact.value},
+                )
+            else:
+                return SentenceVerificationResult(
+                    sentence_idx=sentence_idx,
+                    sentence_text=sentence,
+                    status="BLOCKED",
+                    supporting_claim_id=None,
+                    extracted_entities={"numbers": sent_numbers},
+                    blocking_reasons=reasons,
                 )
 
         # 3. Extract entities from candidate sentence
@@ -214,28 +416,48 @@ class StrictVerifier:
             claim_words = set(re.findall(r"[a-zA-Z0-9]+", claim_norm.lower()))
 
             overlap = len(clean_sent_words.intersection(claim_words))
-            score = overlap / max(1, len(clean_sent_words))
+            union = len(clean_sent_words.union(claim_words))
+            jaccard = overlap / union if union > 0 else 0.0
 
-            # Exact substring match gives 1.0
-            if claim.text.strip().lower() in sentence.strip().lower() or sentence.strip().lower() in claim.text.strip().lower():
-                score = 1.0
+            # Exact full sentence or clean bullet match gives 2.0
+            clean_s = re.sub(r"^[-*•]\s*", "", sentence).strip().lower()
+            clean_c = claim.text.strip().lower()
+            if clean_s == clean_c:
+                score = 2.0
+            elif len(clean_c) > 15 and (clean_c in clean_s or clean_s in clean_c):
+                score = 1.0 + jaccard
+            else:
+                score = jaccard
 
             if score > max_overlap_score:
                 max_overlap_score = score
                 best_match_claim = claim
 
-        if not best_match_claim or max_overlap_score < 0.4:
-            # Check if this sentence is a list of verified skills (e.g. "FastAPI, Python, SQLite, Sockets")
-            if ("," in sentence or len(extracted_tools) >= 2) and extracted_tools:
+        if not best_match_claim or max_overlap_score < 0.30:
+            # Check if this sentence is a list of verified skills or project tools (e.g. "FastAPI, Python, SQLite" or "Technologies: Go, Redis")
+            # Invariant: Skill/tool listings cannot contain metric numbers (e.g. 5,000 req/sec)
+            is_skill_listing = (
+                not extracted_numbers
+                and ("," in sentence or len(extracted_tools) >= 2 or sentence.lower().startswith("technologies:") or sentence.lower().startswith("tools:"))
+                and extracted_tools
+            )
+            if is_skill_listing:
                 all_eligible_tools = set()
                 for c in eligible_claims:
                     all_eligible_tools.update(t.lower() for t in c.tools)
                     for t_name in extract_tools_from_text(c.text):
                         all_eligible_tools.add(t_name.lower())
-                    if getattr(c, "claim_type", None) and getattr(c.claim_type, "value", str(c.claim_type)) == "skill":
+                    ctype_val = getattr(c, "claim_type", None)
+                    if ctype_val and getattr(ctype_val, "value", str(ctype_val)).lower() in ("skill", "tool"):
                         all_eligible_tools.add(c.text.strip().lower())
 
-                unverified_tools = [t for t in extracted_tools if t.lower() not in all_eligible_tools]
+                unverified_tools = []
+                for t in extracted_tools:
+                    tl = t.lower()
+                    aliases = TOOL_ALIASES.get(tl, [])
+                    if tl not in all_eligible_tools and not any(a in all_eligible_tools for a in aliases):
+                        unverified_tools.append(t)
+
                 if not unverified_tools:
                     return SentenceVerificationResult(
                         sentence_idx=sentence_idx,
@@ -256,6 +478,9 @@ class StrictVerifier:
                         blocking_reasons=reasons,
                     )
 
+            unbacked_outside = extract_unbacked_technical_terms(sentence, eligible_claims, confirmed_facts)
+            for ut in unbacked_outside:
+                reasons.append(f"Unbacked technical term or package token: '{ut}' is not present in supporting claim or verified skill set.")
             reasons.append("No supporting eligible claim or confirmed profile fact found for sentence.")
             return SentenceVerificationResult(
                 sentence_idx=sentence_idx,
@@ -274,11 +499,21 @@ class StrictVerifier:
         # Check Tools: Every tool mentioned in the sentence must be present in the claim's tools or text
         for t in extracted_tools:
             t_lower = t.lower()
-            if t_lower not in claim_tools and not TOOL_REGEX_MAP[t].search(best_match_claim.text):
+            aliases = TOOL_ALIASES.get(t_lower, [])
+            valid_names = {t_lower} | set(aliases)
+            in_claim = any(vn in claim_tools or any(vn in ct.lower() for ct in claim_tools) or TOOL_REGEX_MAP[t].search(best_match_claim.text) for vn in valid_names)
+            if not in_claim:
                 # Check if tool is confirmed in another claim
-                in_other_eligible = any(t_lower in (ct.lower() for ct in c.tools) for c in eligible_claims)
+                in_other_eligible = any(any(vn in (ct.lower() for ct in c.tools) or vn in c.text.lower() for vn in valid_names) for c in eligible_claims)
                 if not in_other_eligible:
                     reasons.append(f"Unbacked tool: '{t}' is not present in supporting claim or verified skill set.")
+
+        # Open-world check: Check for unbacked technical terms, packages, or frameworks outside KNOWN_TOOLS
+        unbacked_outside = extract_unbacked_technical_terms(sentence, eligible_claims, confirmed_facts)
+        for ut in unbacked_outside:
+            # Avoid duplicate reporting if already flagged
+            if not any(ut.lower() in r.lower() for r in reasons):
+                reasons.append(f"Unbacked technical term or package token: '{ut}' is not present in supporting claim or verified skill set.")
 
         # Check Numbers: Derived or rounded numbers are strictly BLOCKED
         # Every number in the sentence must exist in the supporting claim
