@@ -1,8 +1,13 @@
-# ResumeProof: Truth-First Agentic Resume & Mock Interview Engine
+# MeritSentinel: Algorithmic Ground-Truth & Defensible Resume Engine
 
-> **A defensible resume tailoring tool that refuses to claim anything the candidate cannot defend.**
+> [!CAUTION]
+> **ACADEMIC RESEARCH ARTIFACT & EVALUATION PREVIEW — NOT CONFIGURED FOR TURNKEY DEPLOYMENT**
+> This repository contains the reference architecture, Bayesian mastery calibration telemetry, offline verification test suites, and empirical hardware latency benchmarks for the **MeritSentinel** platform.
+> Turnkey SaaS execution, standalone public deployment, and commercial replication are strictly restricted under the [Evaluation License](LICENSE). Turnkey execution scripts, production credentials, and hosted configurations are omitted from this public release.
 
-ResumeProof extracts claims and profile facts from candidate resumes, tests knowledge depth via rubric-grounded adaptive mock interviews, tracks mastery and confidence with half-life decay, and enforces deterministic verification that **blocks export** of any unproven skill, tool, or metric.
+> **An algorithmic sentinel for candidate technical merit that refuses to claim anything the candidate cannot defend under line-level cross-examination.**
+
+**MeritSentinel** extracts technical claims and profile facts from candidate resumes, audits technical depth via rubric-grounded adaptive mock interviews, models skill retention using Bayesian shrinkage with half-life decay, and enforces a deterministic verification gate that **physically blocks export** of any unproven skill, tool, or metric.
 
 ---
 
@@ -64,26 +69,14 @@ Each persona includes `.md` and `.pdf` resumes, project documentation, planted t
 
 ---
 
-## Quickstart & CLI Commands
+## Architecture Pipeline & Execution Contracts
 
-### 1. Extract and Review Claims from Resume
-```bash
-# Auto-confirm mode (for CI or automated pipelines)
-python -m resumeproof.cli extract --resume data/demo/alex_rivera/resume.pdf --persona alex_rivera --auto-confirm --fake-llm
+The MeritSentinel engine operates across three discrete, sequentially guarded stages:
 
-# Interactive review mode (walks through profile facts and claims)
-python -m resumeproof.cli extract --resume data/demo/sam_okafor/resume.pdf --persona sam_okafor
-```
-
-### 2. Run Offline Tests
-```bash
-pytest tests/ -v
-```
-
-### 3. Run Manual Real-Model Benchmark
-```bash
-python scripts/run_manual_benchmark.py --model qwen2.5:7b --output results/benchmark_qwen2.5_7b.json
-```
+1. **Extraction & Grounding Core**: Resumes are parsed using semantic line unwrapping (`pdf_parser.py`) to eliminate line-wrap fragmentation. Profile facts (CGPA, degree, employer) and technical claims (metrics, tools, skills) are stored in an isolated SQLite database schema (`ClaimStore`).
+2. **Bayesian Interview & Mastery Engine**: Question planner prioritizes untested claims, generates rubric-grounded challenges via local 3B LLM, and evaluates answers via zero-temperature 7B rubric grader. Candidate confidence is calculated via:
+   $$\text{confidence} = \frac{n_{\text{eff}}}{n_{\text{eff}} + 1.5}, \quad \text{effective\_score} = 2.0 + (\text{aggregate} - 2.0) \times \text{confidence}$$
+3. **Deterministic Hard-Blocking Export Gate**: During resume tailoring against target Job Descriptions, unverified skills or unbacked metrics are strictly isolated to the Gap Report. The deterministic verifier scans all exported tokens using Python AST and regex—export is physically aborted if any unbacked entity is present.
 
 ---
 

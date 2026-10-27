@@ -1,0 +1,16 @@
+# Academic Research & Evaluation License (All Rights Reserved)
+
+Copyright (c) 2026 Sanidhya Agrawal. All Rights Reserved.
+
+### Terms of Inspection and Use
+
+1. **Permitted Use**:
+   Permission is hereby granted, free of charge, to any person inspecting this repository solely for the non-commercial purposes of **academic peer review, individual research evaluation, and educational examination**.
+
+2. **Prohibited Uses**:
+   - **No Standalone Turnkey Deployment**: Standalone execution, public hosting, SaaS provisioning, or commercial operation of this software is strictly prohibited.
+   - **No Commercial Exploitation**: You may not sell, sublicense, lease, monetize, or incorporate this software or its evaluation suites into commercial products or recruitment platforms.
+   - **No Automated Scrapers / Ingestion**: Unsolicited training of commercial AI models or automated data extraction from evaluation datasets without explicit prior written authorization is forbidden.
+
+3. **Warranty Disclaimer**:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR OUT OF THE USE OR OTHER DEALINGS IN THE SOFTWARE.
