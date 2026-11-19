@@ -1,275 +1,494 @@
 {% extends "base.html" %}
 
-{% block title %}ResumeProof | Claim Review & Grounding{% endblock %}
+{% block title %}MeritSentinel | Claim Review & Grounding{% endblock %}
 
 {% block content %}
-<!-- Top Header & Action Row -->
-<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem;">
+<!-- Top Title Row -->
+<div class="review-page-header">
   <div>
     <h1>Candidate Claim Verification</h1>
-    <p class="subtitle" style="margin-bottom: 0;">Review parsed claims for User <code>{{ user_id }}</code>. Confirm claims to include in the technical interview audit.</p>
+    <p class="subtitle">Review parsed Technical Claims for <code>{{ user_id }}</code>. Confirm claims to include in the interview audit.</p>
   </div>
-  
-  <div style="display: flex; gap: 0.75rem; align-items: center;">
-    <form action="/review/{{ user_id }}/start_interview" method="POST" id="start-interview-form">
-      <input type="hidden" name="persona" value="{{ persona_id }}">
-      <button type="submit" id="btn-start-interview" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
-        <span>Start Technical Interview</span>
-        <span id="interview-ready-badge" class="badge" style="background: rgba(255,255,255,0.2); color: #fff; font-size: 0.75rem;">0 ready</span>
-        <span>&rarr;</span>
-      </button>
-    </form>
+  <div class="kbd-hint-strip" title="Keyboard shortcuts for fast auditing">
+    <kbd>J</kbd>/<kbd>K</kbd> Navigate &middot; <kbd>C</kbd> Confirm &middot; <kbd>R</kbd> Reject &middot; <kbd>E</kbd> Edit &middot; <kbd>/</kbd> Search
   </div>
 </div>
 
-<!-- Live Review Progress Bar -->
-<div class="review-stats-bar">
-  <div class="review-stat-item">
-    <span id="stat-confirmed" class="review-stat-num" style="color: var(--success-text);">0</span>
-    <span class="review-stat-lbl">Confirmed</span>
-  </div>
-  <div class="review-stat-item">
-    <span id="stat-pending" class="review-stat-num" style="color: var(--warning-text);">0</span>
-    <span class="review-stat-lbl">Pending</span>
-  </div>
-  <div class="review-stat-item">
-    <span id="stat-rejected" class="review-stat-num" style="color: var(--danger-text);">0</span>
-    <span class="review-stat-lbl">Rejected</span>
-  </div>
-  <div class="review-stat-item">
-    <span id="stat-total" class="review-stat-num">{{ claims|length }}</span>
-    <span class="review-stat-lbl">Total</span>
-  </div>
-  
-  <div class="review-progress-track" title="Confirmation Progress">
-    <div id="stat-progress-fill" class="review-progress-fill" style="width: 0%;"></div>
-  </div>
-  
-  <div style="font-size: 0.85rem; font-weight: 600; color: #fff; min-width: 48px; text-align: right;" id="stat-percentage">
-    0%
-  </div>
-</div>
-
-<!-- Candidate Facts Overview -->
-{% if facts %}
-<div class="card" style="margin-bottom: 1.75rem; padding: 1.25rem 1.5rem;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">
-      Candidate Profile Facts ({{ facts|length }}) &mdash; Confirmed Individually
-    </div>
-    <span style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
-      <span>●</span> Category 1: Explicit candidate review required
-    </span>
-  </div>
-
-  <div class="facts-grid">
-    {% for f in facts %}
-    <div class="fact-card" id="fact-{{ f.id }}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
-      <div>
-        <div class="fact-card-label">{{ f.fact_type.value.replace('_', ' ') }}</div>
-        <div class="fact-card-value">{{ f.value }}</div>
+<!-- Ultra-Compact 44px Frosted Sticky Command Bar -->
+<div class="review-sticky-header">
+  <div class="sticky-inner">
+    <!-- Left: Identity & Live Readiness Meter -->
+    <div class="sticky-left">
+      <span class="sticky-candidate-name">
+        {% if facts_by_type.get('name') %}{{ facts_by_type.get('name').value }}{% else %}{{ user_id }}{% endif %}
+      </span>
+      <div class="sticky-readiness">
+        <div class="readiness-track" title="Interview Verification Progress">
+          <div id="stat-progress-fill" class="readiness-fill" style="width: 0%;"></div>
+        </div>
+        <span id="stat-percentage" class="readiness-pct">0%</span>
+        <span class="readiness-count">
+          <span id="stat-confirmed">0</span>/<span id="stat-total">{{ claims|length }}</span> Verified
+        </span>
       </div>
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        {% if f.is_confirmed %}
-        <span class="badge badge-success" style="font-size: 0.7rem;">Confirmed</span>
-        <button 
-          class="btn btn-secondary btn-sm"
-          hx-post="/review/{{ user_id }}/reject_fact"
-          hx-vals='{"fact_id": "{{ f.id }}"}'
-          hx-target="#fact-{{ f.id }}"
-          hx-swap="outerHTML">
-          Undo
+    </div>
+
+    <!-- Center: Integrated Search Pill -->
+    <div class="sticky-center">
+      <div class="search-wrapper">
+        <span class="search-icon">/</span>
+        <input
+          type="text"
+          id="claim-search"
+          class="sticky-search-input"
+          placeholder="Filter claims, tools, metrics..."
+          oninput="handleSearch(this.value)"
+        >
+      </div>
+    </div>
+
+    <!-- Right: Filter Pills, Micro Bulk Actions & Primary CTA -->
+    <div class="sticky-right">
+      <div class="status-filters" id="filter-pills">
+        <button type="button" class="filter-pill active" onclick="applyFilter('all', this)">All</button>
+        <button type="button" class="filter-pill" onclick="applyFilter('status-extracted', this)">Pending</button>
+        <button type="button" class="filter-pill" onclick="applyFilter('status-confirmed', this)">Confirmed</button>
+        <button type="button" class="filter-pill" onclick="applyFilter('status-rejected', this)">Rejected</button>
+      </div>
+
+      <div class="sticky-global-actions">
+        <button type="button" class="btn-quiet-micro" id="btn-toggle-all-sections" onclick="toggleAllSections(this)" title="Collapse or expand all sections">
+          Collapse All
         </button>
-        {% else %}
-        <span class="badge badge-neutral" style="font-size: 0.7rem;">Pending</span>
-        <button 
-          class="btn btn-success btn-sm"
-          hx-post="/review/{{ user_id }}/confirm_fact"
-          hx-vals='{"fact_id": "{{ f.id }}"}'
-          hx-target="#fact-{{ f.id }}"
-          hx-swap="outerHTML">
-          Confirm
-        </button>
+        <form action="/review/{{ user_id }}/confirm_all" method="POST" style="margin: 0;">
+          <input type="hidden" name="persona" value="{{ persona_id }}">
+          <button type="submit" class="btn-quiet-micro emerald" title="Confirm all technical claims">
+            ✓ All
+          </button>
+        </form>
+        <form action="/review/{{ user_id }}/reject_all" method="POST" style="margin: 0;" onsubmit="return confirm('Reject all extracted claims for {{ user_id }}?');">
+          <input type="hidden" name="persona" value="{{ persona_id }}">
+          <button type="submit" class="btn-quiet-micro rose" title="Reject all claims">
+            ✕ All
+          </button>
+        </form>
+        <form action="/review/{{ user_id }}/reset_all" method="POST" style="margin: 0;" onsubmit="return confirm('Reset all claims back to Pending?');">
+          <input type="hidden" name="persona" value="{{ persona_id }}">
+          <button type="submit" class="btn-quiet-micro" title="Reset all technical claims to pending">
+            ↺ Reset
+          </button>
+        </form>
+      </div>
+
+      <div class="sticky-cta-group">
+        {% if active_session %}
+        <a href="/interview/{{ active_session.id }}" class="btn btn-primary btn-xs" style="background: #2563eb;">
+          Resume ({{ active_session.turns|length + 1 }}/{{ active_session.budget }}) &rarr;
+        </a>
         {% endif %}
+        <form action="/review/{{ user_id }}/start_interview" method="POST" id="start-interview-form" style="margin: 0; display: flex; align-items: center; gap: 0.35rem;">
+          <input type="hidden" name="persona" value="{{ persona_id }}">
+          <select name="budget" class="budget-select" title="Question budget">
+            <option value="5" selected>5 Qs</option>
+            <option value="8">8 Qs</option>
+            <option value="10">10 Qs</option>
+          </select>
+          <button type="submit" id="btn-start-interview" class="btn {% if active_session %}btn-secondary{% else %}btn-primary{% endif %} btn-xs">
+            <span>{% if active_session %}New Interview{% else %}Start Interview{% endif %}</span>
+            <span id="interview-ready-badge" class="cta-ready-pill">0 ready</span>
+            <span>&rarr;</span>
+          </button>
+        </form>
       </div>
     </div>
-    {% endfor %}
   </div>
 </div>
+
+<!-- SECTION 1: Candidate Profile Facts (Seamless Metadata Strip) -->
+{% if facts %}
+<section class="review-section-block" id="section-facts">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">Candidate Profile Facts <span class="section-count">({{ facts|length }})</span></h2>
+      <span class="section-line-meta">
+        {% if facts_by_type.get('degree') %}{{ facts_by_type.get('degree').value }}{% endif %}
+        {% if facts_by_type.get('education_institution') %} &middot; {{ facts_by_type.get('education_institution').value }}{% endif %}
+        {% if facts_by_type.get('cgpa') %} &middot; CGPA {{ facts_by_type.get('cgpa').value }}{% endif %}
+        {% if facts_by_type.get('graduation_date') %} &middot; {{ facts_by_type.get('graduation_date').value }}{% endif %}
+      </span>
+    </div>
+    <div class="section-quiet-actions">
+      <form action="/review/{{ user_id }}/confirm_all_facts" method="POST" style="margin: 0;">
+        <button type="submit" class="btn-quiet-link emerald" title="Confirm all profile facts">Verify all</button>
+      </form>
+      <span class="quiet-sep">&middot;</span>
+      <form action="/review/{{ user_id }}/reset_all_facts" method="POST" style="margin: 0;">
+        <button type="submit" class="btn-quiet-link" title="Reset all profile facts to Pending">Reset</button>
+      </form>
+      <span class="quiet-sep">&middot;</span>
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-facts" onclick="toggleSectionFold(this, 'section-facts-body')" title="Toggle facts visibility">−</button>
+    </div>
+  </div>
+
+  <div id="section-facts-body" class="collapsible-section-body">
+    <div class="facts-chips-grid">
+      {% for f in facts %}
+      {% include "partials/fact_row.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endif %}
 
-<!-- Claims Review Toolbar & Table -->
-<div class="card" style="padding: 0; overflow: hidden;">
-  <!-- Toolbar: Bulk Actions + Search -->
-  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-    <div>
-      <h2 style="margin: 0 0 0.25rem 0; font-size: 1.15rem;">Technical Claims (<span id="visible-claims-count">{{ claims|length }}</span>)</h2>
-      <div style="font-size: 0.82rem; color: var(--text-muted);">Confirm or reject items to tune the interview planner</div>
+<!-- SECTION 2: Categorized Technical Stack & Skills (Monochrome Matrix) -->
+{% if skills_by_category %}
+<section class="review-section-block" id="section-skills">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">Technical Stack &amp; Core Skills <span class="section-count">({{ skill_claims|length }})</span></h2>
+      <span class="section-line-meta">Click any skill to cycle Pending &rarr; Confirmed &rarr; Rejected</span>
     </div>
-
-    <!-- Bulk Action Controls -->
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <form action="/review/{{ user_id }}/confirm_all" method="POST" style="margin: 0;">
-        <input type="hidden" name="persona" value="{{ persona_id }}">
-        <button type="submit" class="btn btn-success btn-sm" title="Confirm all extracted claims in one click">
-          ✓ Confirm All
-        </button>
-      </form>
-
-      <form action="/review/{{ user_id }}/reject_all" method="POST" style="margin: 0;">
-        <input type="hidden" name="persona" value="{{ persona_id }}">
-        <button type="submit" class="btn btn-danger btn-sm" title="Reject all claims">
-          ✕ Reject All
-        </button>
-      </form>
-
-      <form action="/review/{{ user_id }}/reset_all" method="POST" style="margin: 0;">
-        <input type="hidden" name="persona" value="{{ persona_id }}">
-        <button type="submit" class="btn btn-secondary btn-sm" title="Reset all review states to pending">
-          ↺ Reset All
-        </button>
-      </form>
+    <div class="section-quiet-actions">
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-skills" onclick="toggleSectionFold(this, 'section-skills-body')" title="Toggle skills visibility">−</button>
     </div>
   </div>
 
-  <!-- Filter Pills Bar & Instant Search -->
-  <div style="padding: 0.85rem 1.5rem; background: rgba(255, 255, 255, 0.015); border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-    <div class="filter-pills" id="filter-pills">
-      <div class="filter-pill active" onclick="applyFilter('all', this)">All ({{ claims|length }})</div>
-      <div class="filter-pill" onclick="applyFilter('project_metric', this)">Project Bullets</div>
-      <div class="filter-pill" onclick="applyFilter('tool', this)">Stack Tools</div>
-      <div class="filter-pill" onclick="applyFilter('skill', this)">Skills</div>
-      <div class="filter-pill" onclick="applyFilter('experience_claim', this)">Experience</div>
-      <div class="filter-pill" onclick="applyFilter('achievement', this)">Achievements</div>
-      <div class="filter-pill" style="border-left: 1px solid rgba(255,255,255,0.15); margin-left: 0.25rem;" onclick="applyFilter('status-pending', this)">Pending</div>
-      <div class="filter-pill" onclick="applyFilter('status-confirmed', this)">Confirmed</div>
-      <div class="filter-pill" onclick="applyFilter('status-rejected', this)">Rejected</div>
-    </div>
+  <div id="section-skills-body" class="collapsible-section-body">
+    <div class="skills-categories-grid">
+      {% for category, cat_skills in skills_by_category.items() %}
+      <div class="skill-category-block">
+        <div class="skill-category-top">
+          <div class="skill-category-title">
+            {{ category }} <span class="section-count">({{ cat_skills|length }})</span>
+          </div>
+          <div class="skill-category-actions">
+            <form action="/review/{{ user_id }}/confirm_skill_category" method="POST" style="margin: 0;">
+              <input type="hidden" name="category" value="{{ category }}">
+              <button type="submit" class="btn-quiet-link emerald" title="Confirm all skills in {{ category }}">Verify group</button>
+            </form>
+            <span class="quiet-sep">&middot;</span>
+            <form action="/review/{{ user_id }}/reset_skill_category" method="POST" style="margin: 0;">
+              <input type="hidden" name="category" value="{{ category }}">
+              <button type="submit" class="btn-quiet-link" title="Reset all skills in {{ category }} to Pending">Reset</button>
+            </form>
+          </div>
+        </div>
 
-    <!-- Live Search Input -->
-    <div>
-      <input type="text" id="claim-search" class="search-box" placeholder="Search claims or tools..." oninput="handleSearch(this.value)">
+        <div class="skills-badge-wrap">
+          {% for s in cat_skills %}
+          {% include "partials/skill_badge.html" %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- SECTION 3: Project Architecture & Technical Metrics -->
+{% if project_claims %}
+<section class="review-section-block" id="section-projects">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">Project Architecture &amp; Technical Metrics <span class="section-count">({{ total_project_claims_count }} across {{ project_claims|length }} projects)</span></h2>
+      <span class="section-line-meta">Interview-gated technical claims, architecture decisions, and verified metrics</span>
+    </div>
+    <div class="section-quiet-actions">
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-projects" onclick="toggleSectionFold(this, 'section-projects-body')" title="Toggle projects section visibility">−</button>
     </div>
   </div>
 
-  <!-- Table of Claims -->
-  <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
-    <table id="claims-table">
-      <thead>
-        <tr>
-          <th style="width: 150px;">Type & Project</th>
-          <th>Claim Statement</th>
-          <th style="width: 200px;">Tools & Metrics</th>
-          <th style="width: 120px;">Status</th>
-          <th style="width: 160px; text-align: right;">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in claims %}
-        <tr id="claim-{{ c.id }}" data-id="{{ c.id }}" data-type="{{ c.claim_type.value }}" data-project="{{ c.project_id or '' }}" data-status="{{ c.status.value }}">
-          <td>
-            <span class="badge badge-neutral">{{ c.claim_type.value }}</span>
-            {% if c.project_id %}
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;"><code>{{ c.project_id }}</code></div>
-            {% endif %}
-          </td>
-          <td>
-            <div class="claim-text" style="color: #fff; font-weight: 500; line-height: 1.45;">{{ c.text }}</div>
-            {% if c.source_line %}
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Source line: {{ c.source_line }}</div>
-            {% endif %}
-          </td>
-          <td>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
-              {% for t in c.tools %}
-              <code>{{ t }}</code>
-              {% endfor %}
-              {% for m in c.metric_values %}
-              <span class="badge badge-warning" style="font-size: 0.7rem;">{{ m }}</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td>
-            {% if c.status.value == 'confirmed' %}
-            <span class="badge badge-success">Confirmed</span>
-            {% elif c.status.value == 'rejected' %}
-            <span class="badge badge-danger">Rejected</span>
-            {% else %}
-            <span class="badge badge-warning">Pending</span>
-            {% endif %}
-          </td>
-          <td style="text-align: right;">
-            <div style="display: inline-flex; gap: 0.4rem;">
-              <button 
-                class="btn btn-success btn-sm"
-                hx-post="/review/{{ user_id }}/confirm_claim"
-                hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id }}"}'
-                hx-target="#claim-{{ c.id }}"
-                hx-swap="outerHTML">
-                Confirm
-              </button>
-              <button 
-                class="btn btn-danger btn-sm"
-                hx-post="/review/{{ user_id }}/reject_claim"
-                hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id }}"}'
-                hx-target="#claim-{{ c.id }}"
-                hx-swap="outerHTML">
-                Reject
-              </button>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div id="section-projects-body" class="collapsible-section-body">
+    <div class="projects-subtoolbar">
+      <button type="button" class="btn-quiet-link" id="btn-toggle-all-projects" onclick="toggleAllProjects(this)">
+        Collapse All Projects
+      </button>
+    </div>
+    <div class="resume-projects-container">
+      {% for proj_id, p_claims in project_claims.items() %}
+      <div class="resume-project-card" id="project-card-{{ proj_id }}">
+        <div class="project-card-header">
+          <div class="project-title-area">
+            <span class="project-name-badge">{{ proj_id.replace('-', ' ') }}</span>
+            <span class="section-count">{{ p_claims|length }} claims</span>
+          </div>
+
+          <div class="section-quiet-actions">
+            <form action="/review/{{ user_id }}/confirm_project" method="POST" style="margin: 0;">
+              <input type="hidden" name="project_id" value="{{ proj_id }}">
+              <button type="submit" class="btn-quiet-link emerald" title="Confirm all claims in {{ proj_id }}">Verify all</button>
+            </form>
+            <span class="quiet-sep">&middot;</span>
+            <form action="/review/{{ user_id }}/reset_project" method="POST" style="margin: 0;">
+              <input type="hidden" name="project_id" value="{{ proj_id }}">
+              <button type="submit" class="btn-quiet-link" title="Reset all claims in {{ proj_id }} to Pending">Reset</button>
+            </form>
+            <span class="quiet-sep">&middot;</span>
+            <button type="button" class="btn-quiet-link btn-project-fold" onclick="toggleProjectFold(this, '{{ proj_id }}')" title="Toggle project bullet list">−</button>
+          </div>
+        </div>
+
+        <div class="project-bullets-list" id="project-bullets-{{ proj_id }}">
+          {% for c in p_claims %}
+          {% include "partials/claim_row.html" %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
+</section>
+{% endif %}
+
+<!-- SECTION 4: Work Experience & Teaching Claims -->
+{% if experience_claims %}
+<section class="review-section-block" id="section-experience">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">Work Experience &amp; Teaching Claims <span class="section-count">({{ experience_claims|length }})</span></h2>
+      <span class="section-line-meta">Instructional hours, mentorship, and verified delivery claims</span>
+    </div>
+    <div class="section-quiet-actions">
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-experience" onclick="toggleSectionFold(this, 'section-experience-body')" title="Toggle experience visibility">−</button>
+    </div>
+  </div>
+
+  <div id="section-experience-body" class="collapsible-section-body">
+    <div class="project-bullets-list flat-list">
+      {% for c in experience_claims %}
+      {% include "partials/claim_row.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- SECTION 5: Achievements, Competitions & Certifications -->
+{% if achievement_claims %}
+<section class="review-section-block" id="section-achievements">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">Achievements, Competitions &amp; Certifications <span class="section-count">({{ achievement_claims|length }})</span></h2>
+      <span class="section-line-meta">Verified credentials &amp; competition milestones</span>
+    </div>
+    <div class="section-quiet-actions">
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-achievements" onclick="toggleSectionFold(this, 'section-achievements-body')" title="Toggle achievements visibility">−</button>
+    </div>
+  </div>
+
+  <div id="section-achievements-body" class="collapsible-section-body">
+    <div class="project-bullets-list flat-list">
+      {% for c in achievement_claims %}
+      {% include "partials/claim_row.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- SECTION 6: General Technical Claims (if any) -->
+{% if other_claims %}
+<section class="review-section-block" id="section-other">
+  <div class="section-line-header">
+    <div class="section-line-title-group">
+      <h2 class="section-line-title">General Technical Claims <span class="section-count">({{ other_claims|length }})</span></h2>
+      <span class="section-line-meta">Unclassified technical and metric claims</span>
+    </div>
+    <div class="section-quiet-actions">
+      <button type="button" class="btn-quiet-link btn-section-fold" id="btn-fold-other" onclick="toggleSectionFold(this, 'section-other-body')" title="Toggle general claims visibility">−</button>
+    </div>
+  </div>
+
+  <div id="section-other-body" class="collapsible-section-body">
+    <div class="project-bullets-list flat-list">
+      {% for c in other_claims %}
+      {% include "partials/claim_row.html" %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if not claims and not facts %}
+<div class="card" style="text-align: center; padding: 3rem 1.5rem;">
+  <h2>No Claims Extracted Yet</h2>
+  <p class="subtitle" style="margin-bottom: 1.5rem;">Upload a resume or load a demo persona to inspect and verify technical claims.</p>
+  <a href="/" class="btn btn-primary">&larr; Go to Upload &amp; Demo</a>
 </div>
+{% endif %}
 
 <script>
   let currentFilter = 'all';
   let currentSearch = '';
+  let activeClaimIndex = -1;
+
+  // Smart Session Persistence for Section Folds
+  function getCollapsedSections() {
+    try {
+      return JSON.parse(sessionStorage.getItem('review_collapsed_sections') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setCollapsedSections(arr) {
+    sessionStorage.setItem('review_collapsed_sections', JSON.stringify(arr));
+  }
+
+  function toggleSectionFold(btn, bodyId) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const isHidden = (body.style.display === 'none');
+    body.style.display = isHidden ? 'block' : 'none';
+    if (btn) btn.textContent = isHidden ? '−' : '+';
+
+    let collapsed = getCollapsedSections();
+    if (isHidden) {
+      collapsed = collapsed.filter(id => id !== bodyId);
+    } else {
+      if (!collapsed.includes(bodyId)) collapsed.push(bodyId);
+    }
+    setCollapsedSections(collapsed);
+    updateGlobalCollapseButton();
+  }
+
+  function toggleAllSections(btn) {
+    const bodies = document.querySelectorAll('.collapsible-section-body');
+    const buttons = document.querySelectorAll('.btn-section-fold');
+    const anyOpen = Array.from(bodies).some(b => b.style.display !== 'none');
+
+    let collapsed = [];
+    bodies.forEach(b => {
+      b.style.display = anyOpen ? 'none' : 'block';
+      if (anyOpen) collapsed.push(b.id);
+    });
+    buttons.forEach(b => b.textContent = anyOpen ? '+' : '−');
+    btn.textContent = anyOpen ? 'Expand All' : 'Collapse All';
+    setCollapsedSections(collapsed);
+  }
+
+  function updateGlobalCollapseButton() {
+    const btn = document.getElementById('btn-toggle-all-sections');
+    if (!btn) return;
+    const bodies = document.querySelectorAll('.collapsible-section-body');
+    if (bodies.length === 0) return;
+    const anyOpen = Array.from(bodies).some(b => b.style.display !== 'none');
+    btn.textContent = anyOpen ? 'Collapse All' : 'Expand All';
+  }
+
+  // Nested Project Folds
+  function getCollapsedProjects() {
+    try {
+      return JSON.parse(sessionStorage.getItem('review_collapsed_projects') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function setCollapsedProjects(arr) {
+    sessionStorage.setItem('review_collapsed_projects', JSON.stringify(arr));
+  }
+
+  function toggleProjectFold(btn, projectId) {
+    const list = document.getElementById('project-bullets-' + projectId);
+    if (!list) return;
+    const isHidden = (list.style.display === 'none');
+    list.style.display = isHidden ? 'flex' : 'none';
+    if (btn) btn.textContent = isHidden ? '−' : '+';
+    if (btn) btn.title = isHidden ? 'Collapse project bullet list' : 'Expand project bullet list';
+
+    let collapsed = getCollapsedProjects();
+    if (isHidden) {
+      collapsed = collapsed.filter(id => id !== projectId);
+    } else {
+      if (!collapsed.includes(projectId)) collapsed.push(projectId);
+    }
+    setCollapsedProjects(collapsed);
+  }
+
+  function toggleAllProjects(btn) {
+    const lists = document.querySelectorAll('.project-bullets-list');
+    const buttons = document.querySelectorAll('.btn-project-fold');
+    const anyOpen = Array.from(lists).some(l => l.style.display !== 'none');
+
+    let collapsed = [];
+    lists.forEach(l => {
+      l.style.display = anyOpen ? 'none' : 'flex';
+      const pid = l.id.replace('project-bullets-', '');
+      if (anyOpen && pid) collapsed.push(pid);
+    });
+    buttons.forEach(b => b.textContent = anyOpen ? '+' : '−');
+    btn.textContent = anyOpen ? 'Expand All Projects' : 'Collapse All Projects';
+    setCollapsedProjects(collapsed);
+  }
+
+  function restoreFoldStates() {
+    const collapsedSections = getCollapsedSections();
+    collapsedSections.forEach(bodyId => {
+      const body = document.getElementById(bodyId);
+      if (body) {
+        body.style.display = 'none';
+        const sectionCard = body.closest('.review-section-block');
+        if (sectionCard) {
+          const btn = sectionCard.querySelector('.btn-section-fold');
+          if (btn) btn.textContent = '+';
+        }
+      }
+    });
+    updateGlobalCollapseButton();
+
+    const collapsedProjects = getCollapsedProjects();
+    collapsedProjects.forEach(pid => {
+      const list = document.getElementById('project-bullets-' + pid);
+      if (list) {
+        list.style.display = 'none';
+        const card = document.getElementById('project-card-' + pid);
+        if (card) {
+          const btn = card.querySelector('.btn-project-fold');
+          if (btn) btn.textContent = '+';
+        }
+      }
+    });
+  }
 
   function updateReviewStats() {
-    const rows = document.querySelectorAll('#claims-table tbody tr');
+    const rows = document.querySelectorAll('.claim-row');
     let confirmed = 0;
-    let rejected = 0;
-    let pending = 0;
 
     rows.forEach(row => {
-      const status = row.getAttribute('data-status');
-      if (status === 'confirmed') confirmed++;
-      else if (status === 'rejected') rejected++;
-      else pending++;
+      if (row.getAttribute('data-status') === 'confirmed') confirmed++;
     });
 
     const total = rows.length;
     const percentage = total > 0 ? Math.round((confirmed / total) * 100) : 0;
 
-    document.getElementById('stat-confirmed').textContent = confirmed;
-    document.getElementById('stat-pending').textContent = pending;
-    document.getElementById('stat-rejected').textContent = rejected;
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-percentage').textContent = `${percentage}%`;
-    document.getElementById('stat-progress-fill').style.width = `${percentage}%`;
+    const elConf = document.getElementById('stat-confirmed');
+    const elTot = document.getElementById('stat-total');
+    const elPct = document.getElementById('stat-percentage');
+    const elFill = document.getElementById('stat-progress-fill');
+
+    if (elConf) elConf.textContent = confirmed;
+    if (elTot) elTot.textContent = total;
+    if (elPct) elPct.textContent = `${percentage}%`;
+    if (elFill) elFill.style.width = `${percentage}%`;
 
     const badge = document.getElementById('interview-ready-badge');
+    const startBtn = document.getElementById('btn-start-interview');
     if (badge) {
       badge.textContent = `${confirmed} ready`;
-      if (confirmed > 0) {
-        badge.style.background = 'var(--success-text)';
-        badge.style.color = '#09090b';
-        badge.style.fontWeight = '700';
-      } else {
-        badge.style.background = 'rgba(255,255,255,0.2)';
-        badge.style.color = '#fff';
-      }
+      badge.className = 'cta-ready-pill ' + (confirmed >= 5 ? 'ready' : confirmed > 0 ? 'partial' : 'empty');
+    }
+    if (startBtn) {
+      startBtn.disabled = (confirmed === 0);
+      startBtn.title = confirmed === 0 ? 'Confirm at least 1 claim before starting the interview' : 'Start technical interview';
     }
   }
 
-  function applyFilter(filterType, element) {
-    currentFilter = filterType;
-    document.querySelectorAll('#filter-pills .filter-pill').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
+  function applyFilter(filterKey, btnEl) {
+    currentFilter = filterKey;
+    document.querySelectorAll('#filter-pills .filter-pill').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
     filterTable();
   }
 
@@ -279,49 +498,146 @@
   }
 
   function filterTable() {
-    const rows = document.querySelectorAll('#claims-table tbody tr');
-    let visibleCount = 0;
+    const rows = document.querySelectorAll('.claim-row');
 
     rows.forEach(row => {
       const type = row.getAttribute('data-type') || '';
       const status = row.getAttribute('data-status') || '';
-      const text = row.textContent.toLowerCase();
+      const project = row.getAttribute('data-project') || '';
+      const text = row.innerText.toLowerCase();
 
-      let matchesFilter = false;
-      if (currentFilter === 'all') {
-        matchesFilter = true;
-      } else if (currentFilter.startsWith('status-')) {
-        const targetStatus = currentFilter.replace('status-', '');
-        matchesFilter = (status === targetStatus);
-      } else {
-        matchesFilter = (type === currentFilter);
+      let matchesFilter = true;
+      if (currentFilter !== 'all') {
+        if (currentFilter.startsWith('status-')) {
+          matchesFilter = (status === currentFilter.replace('status-', ''));
+        } else {
+          matchesFilter = (type === currentFilter);
+        }
       }
 
       let matchesSearch = true;
-      if (currentSearch.length > 0) {
-        matchesSearch = text.includes(currentSearch);
+      if (currentSearch) {
+        matchesSearch = text.includes(currentSearch) || project.toLowerCase().includes(currentSearch);
       }
 
-      if (matchesFilter && matchesSearch) {
-        row.style.display = '';
-        visibleCount++;
-      } else {
-        row.style.display = 'none';
-      }
+      row.style.display = (matchesFilter && matchesSearch) ? '' : 'none';
     });
 
-    const counter = document.getElementById('visible-claims-count');
-    if (counter) counter.textContent = visibleCount;
+    document.querySelectorAll('.resume-project-card').forEach(card => {
+      const cardRows = card.querySelectorAll('.claim-row');
+      if (cardRows.length > 0) {
+        const hasVisible = Array.from(cardRows).some(r => r.style.display !== 'none');
+        card.style.display = hasVisible ? '' : 'none';
+      }
+    });
   }
 
-  // Update stats on load and on any HTMX swap
+  // Keyboard Auditing Navigation (J / K / C / R / U / E / / / Escape)
+  function getVisibleClaimRows() {
+    return Array.from(document.querySelectorAll('.claim-row')).filter(r => r.offsetParent !== null && !r.classList.contains('editing'));
+  }
+
+  function setActiveClaim(idx) {
+    const visible = getVisibleClaimRows();
+    document.querySelectorAll('.claim-row.kbd-active').forEach(r => r.classList.remove('kbd-active'));
+    if (visible.length === 0) { activeClaimIndex = -1; return null; }
+    activeClaimIndex = Math.max(0, Math.min(idx, visible.length - 1));
+    const target = visible[activeClaimIndex];
+    target.classList.add('kbd-active');
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return target;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    const isInput = (tag === 'input' || tag === 'textarea' || tag === 'select');
+
+    if (e.key === '/' && !isInput) {
+      e.preventDefault();
+      const search = document.getElementById('claim-search');
+      if (search) { search.focus(); search.select(); }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (isInput) {
+        e.target.blur();
+        if (e.target.id === 'claim-search' && e.target.value) {
+          e.target.value = '';
+          handleSearch('');
+        }
+      }
+      return;
+    }
+
+    if (isInput) return;
+
+    const visible = getVisibleClaimRows();
+    if (visible.length === 0) return;
+
+    if (e.key === 'j' || e.key === 'J' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveClaim(activeClaimIndex + 1);
+    } else if (e.key === 'k' || e.key === 'K' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveClaim(activeClaimIndex <= 0 ? 0 : activeClaimIndex - 1);
+    } else if (activeClaimIndex >= 0 && activeClaimIndex < visible.length) {
+      const row = visible[activeClaimIndex];
+      if (e.key === 'c' || e.key === 'C') {
+        const btn = row.querySelector('.btn-micro-confirm');
+        if (btn) { e.preventDefault(); btn.click(); }
+      } else if (e.key === 'r' || e.key === 'R') {
+        const btn = row.querySelector('.btn-micro-reject');
+        if (btn) { e.preventDefault(); btn.click(); }
+      } else if (e.key === 'u' || e.key === 'U') {
+        const btn = row.querySelector('.btn-micro-undo');
+        if (btn) { e.preventDefault(); btn.click(); }
+      } else if (e.key === 'e' || e.key === 'E') {
+        const btn = row.querySelector('.btn-micro-edit');
+        if (btn) { e.preventDefault(); btn.click(); }
+      }
+    }
+  });
+
+  // Instant Scroll Restoration across Full Page Submissions & HTMX Swaps
+  if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+  }
+
+  window.addEventListener('scroll', () => {
+    sessionStorage.setItem('review_scrollY', window.scrollY);
+  }, { passive: true });
+
+  document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', () => {
+      sessionStorage.setItem('review_scrollY', window.scrollY);
+    });
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
+    const savedY = sessionStorage.getItem('review_scrollY');
+    if (savedY !== null) {
+      window.scrollTo({ top: parseInt(savedY, 10), behavior: 'instant' });
+    }
+    restoreFoldStates();
     updateReviewStats();
   });
 
-  document.body.addEventListener('htmx:afterSwap', (e) => {
+  document.body.addEventListener('htmx:beforeSwap', () => {
+    window._preSwapY = window.scrollY;
+  });
+
+  document.body.addEventListener('htmx:afterSwap', () => {
+    if (typeof window._preSwapY === 'number') {
+      window.scrollTo({ top: window._preSwapY, behavior: 'instant' });
+    }
+    restoreFoldStates();
     updateReviewStats();
     filterTable();
+    if (activeClaimIndex >= 0) {
+      const visible = getVisibleClaimRows();
+      if (visible[activeClaimIndex]) visible[activeClaimIndex].classList.add('kbd-active');
+    }
   });
 </script>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}ResumeProof | Technical Mock Interview{% endblock %}
+{% block title %}MeritSentinel | Technical Mock Interview{% endblock %}
 
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
@@ -11,7 +11,7 @@
   <div style="display: flex; align-items: center; gap: 1rem;">
     <div id="grade-status">
       {% if has_pending_grades %}
-      <div hx-get="/interview/{{ session.id }}/grade_status" hx-trigger="every 1s" hx-swap="outerHTML" class="badge badge-pending">
+      <div hx-get="/interview/{{ session.id }}/grade_status?was_pending=1" hx-trigger="every 1s" hx-swap="outerHTML" class="badge badge-pending">
         ⏳ Background Grading Active
       </div>
       {% else %}
@@ -20,6 +20,7 @@
       </div>
       {% endif %}
     </div>
+    <a href="/interview/{{ session.id }}/logs" class="btn btn-secondary btn-sm" title="View immutable cryptographic audit trail">🛡️ Audit Logs</a>
     <a href="/dashboard/{{ session.user_id }}" class="btn btn-secondary btn-sm">Mastery Dashboard &rarr;</a>
   </div>
 </div>
@@ -32,53 +33,52 @@
 {% if current_question %}
 <!-- Active Question Card -->
 <div class="card" style="border-color: #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.08);">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span class="badge badge-neutral">Turn {{ (turns|length + 1) }} of {{ session.budget }}</span>
-      <span class="badge badge-warning">Priority: {{ current_question.priority.value }}</span>
-      {% if current_question.is_followup %}
-      <span class="badge badge-danger">Follow-up</span>
-      {% endif %}
-    </div>
-    {% if current_question.latency_ms %}
-    <span style="font-size: 0.75rem; color: var(--text-muted);">Generated in {{ current_question.latency_ms|round(1) }}ms</span>
-    {% endif %}
-  </div>
+  <form action="/interview/{{ session.id }}/answer" method="POST" id="interview-answer-form">
+    {% include "partials/question_container.html" %}
 
-  <div style="margin-bottom: 1.5rem;">
-    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">Target Claim</div>
-    <div style="color: #d4d4d8; font-size: 0.95rem; background: rgba(255, 255, 255, 0.03); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--surface-border);">
-      {{ target_claim_text }}
-    </div>
-  </div>
-
-  <div style="margin-bottom: 1.5rem;">
-    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent-color); font-weight: 600; margin-bottom: 0.5rem;">Technical Interview Question</div>
-    <div style="font-size: 1.2rem; font-weight: 600; color: #fff; line-height: 1.4;">
-      {{ current_question.question_text }}
-    </div>
-  </div>
-
-  <form action="/interview/{{ session.id }}/answer" method="POST">
-    <input type="hidden" name="question_id" value="{{ current_question.id }}">
-    <input type="hidden" name="claim_id" value="{{ current_question.claim_id }}">
-    <input type="hidden" name="priority" value="{{ current_question.priority.value }}">
-    <input type="hidden" name="question_text" value="{{ current_question.question_text }}">
-    <input type="hidden" name="is_followup" value="{{ '1' if current_question.is_followup else '0' }}">
-    <input type="hidden" name="rubric_id" value="{{ current_question.rubric_id or '' }}">
-    <input type="hidden" name="project_id" value="{{ current_question.project_id or '' }}">
-
-    <div class="form-group">
-      <label for="answer_text">Your Technical Response</label>
+    <div class="form-group" style="margin-top: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <label for="answer_text">Your Technical Response</label>
+        <span id="answer-word-count" style="font-size: 0.72rem; color: var(--text-muted);">0 words &bull; Ctrl+Enter to submit</span>
+      </div>
       <textarea id="answer_text" name="answer_text" placeholder="Detail your exact architectural mechanisms, configurations, and verified parameters..." required></textarea>
     </div>
 
     <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center;">
       <span style="font-size: 0.8rem; color: var(--text-muted);">Async background grading enables instant progression to the next question.</span>
-      <button type="submit" class="btn btn-primary">Submit Answer & Continue &rarr;</button>
+      <button type="submit" id="btn-submit-answer" class="btn btn-primary">Submit Answer &amp; Continue &rarr;</button>
     </div>
   </form>
 </div>
+<script>
+  (function() {
+    const ta = document.getElementById('answer_text');
+    const wc = document.getElementById('answer-word-count');
+    const form = document.getElementById('interview-answer-form');
+    const btn = document.getElementById('btn-submit-answer');
+    if (ta && wc) {
+      ta.addEventListener('input', () => {
+        const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+        wc.textContent = `${words} word${words === 1 ? '' : 's'} \u2022 Ctrl+Enter to submit`;
+      });
+      ta.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && form) {
+          e.preventDefault();
+          if (ta.value.trim().length > 0) {
+            if (form.requestSubmit) form.requestSubmit(); else form.submit();
+          }
+        }
+      });
+    }
+    if (form && btn) {
+      form.addEventListener('submit', () => {
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.textContent = 'Submitting...';
+      });
+    }
+  })();
+</script>
 {% else %}
 <!-- Concluded Banner -->
 <div class="card" style="text-align: center; padding: 3rem 2rem;">
@@ -135,7 +135,10 @@
 
       {% if t.grade %}
       <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 0.85rem; margin-top: 0.75rem;">
-        {% if t.grade.evidence_quote %}
+        {% if t.grade.raw_score == 0 %}
+        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--danger-text); font-weight: 600; margin-bottom: 0.25rem;">Cited Answer Excerpt (Unverified)</div>
+        <div style="font-size: 0.85rem; color: #f87171; margin-bottom: 0.5rem;"><code>"{{ t.answer.answer_text[:120] }}"</code></div>
+        {% elif t.grade.evidence_quote %}
         <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--success-text); font-weight: 600; margin-bottom: 0.25rem;">Verbatim Evidence Quote</div>
         <div style="font-size: 0.85rem; color: #34d399; margin-bottom: 0.5rem;"><code>"{{ t.grade.evidence_quote }}"</code></div>
         {% endif %}

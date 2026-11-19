@@ -106,7 +106,7 @@ def find_candidate_files() -> tuple[Path, Path]:
     upload_dir = ROOT_DIR / ".data_uploads"
     if upload_dir.exists():
         for f in upload_dir.glob("*.pdf"):
-            if "resume" in f.name.lower() or "sanidhya" in f.name.lower():
+            if "resume" in f.name.lower() or "jordan" in f.name.lower():
                 resume_path = f
                 break
 

@@ -1,12 +1,42 @@
 {% extends "base.html" %}
 
-{% block title %}ResumeProof | Home & Persona Selection{% endblock %}
+{% block title %}MeritSentinel | Home & Persona Selection{% endblock %}
 
 {% block content %}
+{% if error_message %}
+<div class="alert-banner alert-danger" id="upload-error-banner" role="alert">
+  <div>
+    <strong>Upload Rejected:</strong> {{ error_message }}
+  </div>
+  <button type="button" class="alert-close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+</div>
+{% endif %}
+<div class="alert-banner alert-danger" id="client-upload-error" role="alert" style="display: none;">
+  <div id="client-upload-error-text"></div>
+  <button type="button" class="alert-close" onclick="this.parentElement.style.display='none'" aria-label="Dismiss">&times;</button>
+</div>
+
 <div style="margin-bottom: 2.5rem;">
   <h1>Adversarial Technical Verification</h1>
   <p class="subtitle">Extract verifiable claims, generate rubric-grounded technical questions, and audit engineering competency under strict evidence standards.</p>
 </div>
+
+{% if active_session %}
+<div class="card" style="margin-bottom: 2rem; border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); display: flex; justify-content: space-between; align-items: center;">
+  <div>
+    <div style="font-weight: 600; color: #60a5fa; font-size: 1.05rem; margin-bottom: 0.25rem;">
+      In-Progress Technical Interview Active
+    </div>
+    <div style="font-size: 0.85rem; color: #d4d4d8;">
+      Session <code>{{ active_session.id[:8] }}</code> &bull; Candidate: <strong>{{ active_session.persona_id }}</strong> &bull; Completed Turn {{ active_session.turns|length }} of {{ active_session.budget }}
+    </div>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="/interview/{{ active_session.id }}/logs" class="btn btn-secondary btn-sm">🛡️ Audit Logs</a>
+    <a href="/interview/{{ active_session.id }}" class="btn btn-primary btn-sm">Resume Interview &rarr;</a>
+  </div>
+</div>
+{% endif %}
 
 <div class="grid-2">
   <!-- Demo Personas -->
@@ -32,7 +62,7 @@
           <input type="radio" name="persona" value="alex_rivera" style="margin-top: 0.25rem;">
           <div>
             <div style="font-weight: 600; color: #fff;">Alex Rivera</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Full-Stack & Cloud • Multi-tenant SaaS, Postgres Partitioning, Redis Caching</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Senior Backend & Distributed Systems • Raft KV, Write-Ahead Log Engine, Flow Limiter</div>
           </div>
         </label>
 
@@ -40,7 +70,7 @@
           <input type="radio" name="persona" value="priya_nair" style="margin-top: 0.25rem;">
           <div>
             <div style="font-weight: 600; color: #fff;">Priya Nair</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">MLOps & Data • Vector Search Pipeline, FAISS, Streaming Ingestion</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">ML & Data Infrastructure • Feature-Forge Pipeline, Tabular-Boost GBDT</div>
           </div>
         </label>
       </div>
@@ -58,7 +88,7 @@
       Upload a PDF or Markdown resume file to parse profile facts and structured technical claims.
     </p>
 
-    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data" onsubmit="showExtractionLoader(this, 'Analyzing Resume Document...')">
+    <form id="upload-form" action="/upload" method="POST" enctype="multipart/form-data" onsubmit="return validateAndShowLoader(this, 'Analyzing Resume Document...')">
       <div class="form-group">
         <label for="custom_user_id">User Identifier</label>
         <input type="text" id="custom_user_id" name="user_id" value="candidate_1" required>
@@ -70,7 +100,7 @@
           <input type="file" id="resume_file" name="file" accept=".pdf,.md" required onchange="handleFileSelect(this)">
           <div class="dropzone-icon">📄</div>
           <div class="dropzone-text" id="dropzone-prompt">Drag & drop resume file here, or browse</div>
-          <div class="dropzone-hint">PDF or Markdown files up to 5 MB</div>
+          <div class="dropzone-hint">PDF or Markdown files up to 5 MB &bull; Strictly 1–5 pages (Reports/papers rejected)</div>
           <div id="file-badge" class="file-selected-badge" style="display: none;">
             <span id="file-badge-name">resume.pdf</span>
             <span id="file-badge-size" style="opacity: 0.75; font-size: 0.75rem;">(64 KB)</span>
@@ -109,9 +139,41 @@
 </div>
 
 <script>
+  function showClientUploadError(msg) {
+    const box = document.getElementById('client-upload-error');
+    const txt = document.getElementById('client-upload-error-text');
+    if (box && txt) {
+      txt.innerHTML = '<strong>Invalid File:</strong> ' + msg;
+      box.style.display = 'flex';
+    }
+  }
+
+  function validateUploadFile(file) {
+    if (!file) return 'Please choose a .pdf or .md resume file.';
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.pdf') && !name.endsWith('.md') && !name.endsWith('.txt')) {
+      return `Unsupported file type. Only .pdf, .md, and .txt files are allowed.`;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return 'File size exceeds the 5 MB maximum limit.';
+    }
+    return null;
+  }
+
   function handleFileSelect(input) {
     const file = input.files[0];
     if (!file) return;
+
+    const err = validateUploadFile(file);
+    const errBox = document.getElementById('client-upload-error');
+    if (err) {
+      showClientUploadError(err);
+      input.value = '';
+      document.getElementById('dropzone-prompt').style.display = '';
+      document.getElementById('file-badge').style.display = 'none';
+      return;
+    }
+    if (errBox) errBox.style.display = 'none';
 
     const promptEl = document.getElementById('dropzone-prompt');
     const badgeEl = document.getElementById('file-badge');
@@ -124,6 +186,18 @@
 
     promptEl.style.display = 'none';
     badgeEl.style.display = 'inline-flex';
+  }
+
+  function validateAndShowLoader(form, titleText) {
+    const fileInput = document.getElementById('resume_file');
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+    const err = validateUploadFile(file);
+    if (err) {
+      showClientUploadError(err);
+      return false;
+    }
+    showExtractionLoader(form, titleText);
+    return true;
   }
 
   // Setup drag-and-drop feedback

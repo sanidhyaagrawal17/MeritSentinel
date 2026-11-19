@@ -44,21 +44,30 @@ class BackgroundGrader:
         )
 
         def _execute_grade() -> GradeResult:
-            if cached_result:
-                grade = cached_result
-            else:
-                grade = self.grader.grade_answer(
-                    claim=claim,
-                    question_text=question_text,
-                    answer_text=answer_text,
-                    rubric=rubric,
-                )
-                self.cache.set(
-                    claim_id=claim.id,
-                    question_text=question_text,
-                    answer_text=answer_text,
-                    model=self.grader.model,
-                    grade=grade,
+            try:
+                if cached_result:
+                    grade = cached_result
+                else:
+                    grade = self.grader.grade_answer(
+                        claim=claim,
+                        question_text=question_text,
+                        answer_text=answer_text,
+                        rubric=rubric,
+                    )
+                    self.cache.set(
+                        claim_id=claim.id,
+                        question_text=question_text,
+                        answer_text=answer_text,
+                        model=self.grader.model,
+                        grade=grade,
+                    )
+            except Exception as exc:
+                logger.error(f"Automated grading failed for task {task_id}: {exc}", exc_info=True)
+                grade = GradeResult(
+                    raw_score=0,
+                    evidence_quote="",
+                    rubric_reference="Grading fallback (LLM error)",
+                    feedback=f"Automated grading failed ({type(exc).__name__}): {exc}"
                 )
 
             if on_complete:
@@ -67,6 +76,17 @@ class BackgroundGrader:
                 except Exception as e:
                     logger.error(f"Error in on_complete callback for task {task_id}: {e}")
             return grade
+
+        # Prune already-done futures when len(self.pending_futures) > 64 to prevent unbounded memory leaks
+        if len(self.pending_futures) > 64:
+            done_keys = [k for k, f in self.pending_futures.items() if f.done()]
+            for k in done_keys:
+                self.pending_futures.pop(k, None)
+            # If still over 64, drop oldest items
+            if len(self.pending_futures) > 64:
+                overflow_keys = list(self.pending_futures.keys())[:len(self.pending_futures) - 64]
+                for k in overflow_keys:
+                    self.pending_futures.pop(k, None)
 
         future = self.executor.submit(_execute_grade)
         self.pending_futures[task_id] = future

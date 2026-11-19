@@ -13,6 +13,7 @@ import re
 import uuid
 
 from resumeproof.schemas.rubric import RubricItem, AtomicPoint
+from resumeproof.schemas.claims import Claim, ClaimType
 
 def _derive_topic(text: str, current_heading: str) -> str:
     """Derives a short descriptive topic slug from heading and text."""
@@ -224,3 +225,56 @@ def build_rubrics_for_persona(
             all_rubrics.extend(build_rubrics_for_project(proj, persona_id=persona_id))
 
     return all_rubrics
+
+
+def synthesize_rubrics_from_claims(
+    claims: list[Claim],
+    persona_id: str,
+) -> list[RubricItem]:
+    """Dynamically synthesizes grounded 0-4 rubric items with atomic points for custom candidate resume claims."""
+    rubrics: list[RubricItem] = []
+    for c in claims:
+        # Exclude generic isolated skill claims from standalone rubrics
+        if c.claim_type == ClaimType.SKILL:
+            continue
+
+        proj_id = c.project_id or "general"
+        topic = _derive_topic(c.text, proj_id)
+        criteria = _build_criteria_for_statement(c.text, proj_id)
+
+        atomic_points: list[AtomicPoint] = []
+        for t in c.tools:
+            atomic_points.append(AtomicPoint(
+                text=f"Demonstrates implementation and configuration of tool: {t}",
+                source_file="resume_claims",
+                source_line=c.source_line or 1,
+                source_quote=c.text,
+            ))
+        for m in c.metric_values:
+            atomic_points.append(AtomicPoint(
+                text=f"Demonstrates empirical verification of metric: {m}",
+                source_file="resume_claims",
+                source_line=c.source_line or 1,
+                source_quote=c.text,
+            ))
+        if not atomic_points:
+            atomic_points.append(AtomicPoint(
+                text=f"Demonstrates technical execution of claim: {c.text}",
+                source_file="resume_claims",
+                source_line=c.source_line or 1,
+                source_quote=c.text,
+            ))
+
+        rubrics.append(RubricItem(
+            id=str(uuid.uuid4()),
+            project_id=proj_id,
+            persona_id=persona_id,
+            topic=topic,
+            source_file="resume_claims",
+            source_line=c.source_line or 1,
+            source_quote=c.text,
+            criteria=criteria,
+            atomic_points=atomic_points,
+        ))
+
+    return rubrics

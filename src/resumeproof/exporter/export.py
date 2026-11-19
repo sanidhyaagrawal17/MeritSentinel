@@ -41,18 +41,47 @@ def export_markdown(
 
 
 def clean_reportlab_text(text: str) -> str:
-    """Sanitizes text for ReportLab Paragraph XML parsing, eliminating raw LaTeX and unclosed tags."""
+    """Sanitizes text for ReportLab Paragraph XML parsing, eliminating raw LaTeX, handling links and inline formatting."""
     # Strip any raw LaTeX syntax like $...$, \frac, \text
     cleaned = re.sub(r"\$([^$]+)\$", r"\1", text)
     cleaned = re.sub(r"\\[a-zA-Z]+", "", cleaned)
+    # Strip inline backticks `text` -> text
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
     # Escape XML entities (avoid double-escaping existing &amp;, &lt;, &gt;, &quot;, &apos;, &bull;)
     cleaned = re.sub(r"&(?!(?:amp|lt|gt|quot|apos|bull);)", "&amp;", cleaned)
+
+    links: list[str] = []
+
+    def _save_md_link(m: re.Match) -> str:
+        label = m.group(1)
+        url = m.group(2)
+        idx = len(links)
+        links.append(f'<a href="{url}"><font color="#2563eb"><u>{label}</u></font></a>')
+        return f"__MD_LINK_{idx}__"
+
+    cleaned = re.sub(r"\[([^\]]+)\]\((https?://[^\)\s]+)\)", _save_md_link, cleaned)
+
+    def _save_bare_link(m: re.Match) -> str:
+        raw = m.group(0).rstrip(".,;)")
+        url = raw if raw.startswith("http") else f"https://{raw}"
+        idx = len(links)
+        links.append(f'<a href="{url}"><font color="#2563eb"><u>{raw}</u></font></a>')
+        return f"__MD_LINK_{idx}__"
+
+    bare_pattern = r"(?:https?://[^\s<]+|(?:www\.)?(?:linkedin\.com/in/[a-zA-Z0-9_\-]+|github\.com/[a-zA-Z0-9_\-]+))"
+    cleaned = re.sub(bare_pattern, _save_bare_link, cleaned)
+
     # Convert markdown bold **text** to <b>text</b>
     cleaned = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", cleaned)
     # Convert markdown italic *text* to <i>\1</i>
     cleaned = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", cleaned)
-    # Clean any unmatched angle brackets
+    # Clean any unmatched angle brackets (preserving formatting tags)
     cleaned = re.sub(r"<(?!(?:b|/b|i|/i|font|/font|u|/u)\b)", "&lt;", cleaned)
+
+    # Restore converted anchor links
+    for idx, link_html in enumerate(links):
+        cleaned = cleaned.replace(f"__MD_LINK_{idx}__", link_html)
+
     return cleaned.strip()
 
 

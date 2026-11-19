@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}ResumeProof | Mastery Matrix Dashboard{% endblock %}
+{% block title %}MeritSentinel | Mastery Matrix Dashboard{% endblock %}
 
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
@@ -36,17 +36,22 @@
 
 <!-- Defensibility Report Card -->
 <div class="card" style="margin-bottom: 2rem; background: linear-gradient(180deg, rgba(24, 24, 27, 0.9) 0%, rgba(18, 18, 21, 0.9) 100%);">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
     <h2 style="margin: 0; font-size: 1.15rem;">Defensibility Index</h2>
-    <span class="badge {% if defensibility_pct >= 70 %}badge-success{% elif defensibility_pct >= 40 %}badge-warning{% else %}badge-danger{% endif %}">
-      {{ defensibility_pct }}% Defensible
-    </span>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span class="badge {% if interviewed_defensibility_pct >= 70 %}badge-success{% elif interviewed_defensibility_pct >= 40 %}badge-warning{% else %}badge-danger{% endif %}">
+        {{ interviewed_defensibility_pct }}% Interviewed Mastery ({{ interviewed_count }} audited)
+      </span>
+      <span class="badge badge-neutral">
+        {{ defensibility_pct }}% Overall Resume Coverage
+      </span>
+    </div>
   </div>
   <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-    The defensibility index represents the share of confirmed technical claims supported by verifiable architectural evidence quotes and deterministic rubric satisfaction.
+    Interviewed Mastery measures verified claims (Score &ge; 3) out of all audited claims; Overall Resume Coverage measures verified claims across the entire extracted resume.
   </p>
   <div style="background: #27272a; border-radius: var(--radius-sm); height: 8px; width: 100%; overflow: hidden;">
-    <div style="background: {% if defensibility_pct >= 70 %}var(--success-text){% elif defensibility_pct >= 40 %}var(--warning-text){% else %}var(--danger-text){% endif %}; height: 100%; width: {{ defensibility_pct }}%;"></div>
+    <div style="background: {% if interviewed_defensibility_pct >= 70 %}var(--success-text){% elif interviewed_defensibility_pct >= 40 %}var(--warning-text){% else %}var(--danger-text){% endif %}; height: 100%; width: {{ interviewed_defensibility_pct }}%;"></div>
   </div>
 </div>
 

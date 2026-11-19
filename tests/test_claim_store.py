@@ -107,7 +107,7 @@ def test_clear_user_data_preserves_confirmed_claims_and_mastery(claim_store):
         id=str(uuid.uuid4()),
         user_id=user_id,
         fact_type=ProfileFactType.NAME,
-        value="Sanidhya Agrawal",
+        value="Jordan Hayes",
         source_line=1,
         is_confirmed=True
     )
@@ -174,7 +174,7 @@ def test_clear_user_data_preserves_confirmed_claims_and_mastery(claim_store):
     facts = claim_store.get_profile_facts(user_id)
     assert len(facts) == 1
     assert facts[0].id == fact_confirmed.id
-    assert facts[0].value == "Sanidhya Agrawal"
+    assert facts[0].value == "Jordan Hayes"
 
     # Verify extracted claim was deleted, but confirmed claim remains
     claims = claim_store.get_claims(user_id)

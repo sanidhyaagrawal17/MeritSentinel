@@ -20,6 +20,8 @@ class InterviewQuestion(BaseModel):
     question_text: str
     is_followup: bool = False
     followup_reason: Optional[str] = None
+    is_rephrased: bool = False
+    original_question_text: Optional[str] = None
     latency_ms: float = 0.0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -67,6 +69,7 @@ class InterviewSession(BaseModel):
     budget: int = 5
     total_questions: int = 0
     status: str = "active"  # "active", "completed", "aborted"
+    current_question: Optional[InterviewQuestion] = None
     turns: list[InterviewTurn] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None

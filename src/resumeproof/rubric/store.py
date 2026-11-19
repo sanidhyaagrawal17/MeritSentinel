@@ -47,6 +47,13 @@ class RubricStore:
         for item in items:
             self.save_rubric(item)
 
+    def clear_rubrics_for_persona(self, persona_id: str) -> None:
+        """Removes previously stored rubrics for a persona before re-ingesting to avoid duplication."""
+        if not persona_id:
+            return
+        with self.db.transaction() as conn:
+            conn.execute("DELETE FROM rubrics WHERE persona_id = ?", (persona_id,))
+
     def _hydrate(self, r) -> RubricItem:
         from resumeproof.schemas.rubric import AtomicPoint
         raw_pts = r["atomic_points"] if "atomic_points" in r.keys() and r["atomic_points"] else "[]"
@@ -73,6 +80,10 @@ class RubricStore:
         with self.db.transaction() as conn:
             r = conn.execute("SELECT * FROM rubrics WHERE id = ?", (rubric_id,)).fetchone()
             return self._hydrate(r) if r else None
+
+    def get_rubric(self, rubric_id: str) -> Optional[RubricItem]:
+        """Convenience alias for get_rubric_by_id."""
+        return self.get_rubric_by_id(rubric_id)
 
     def get_rubrics_for_project(self, project_id: str) -> list[RubricItem]:
         with self.db.transaction() as conn:

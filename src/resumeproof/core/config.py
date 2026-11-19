@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import os
+import tempfile
 from pydantic import BaseModel, Field
 
 class Settings(BaseModel):
@@ -72,9 +73,30 @@ class Settings(BaseModel):
         default_factory=lambda: Path(os.getenv("RESUMEPROOF_UPLOAD_DIR", ".data_uploads")),
         description="Directory for temporary uploaded user resumes (git-ignored)"
     )
+    export_dir: Path = Field(
+        default_factory=lambda: Path(
+            os.getenv("RESUMEPROOF_EXPORT_DIR", str(Path(tempfile.gettempdir()) / "meritsentinel_exports"))
+        ),
+        description="Directory for temporary compiled PDF exports before streaming to client"
+    )
+    secret_key: str = Field(
+        default_factory=lambda: os.getenv(
+            "RESUMEPROOF_SECRET_KEY",
+            "meritsentinel_local_dev_secret_key_change_in_prod_32ch",
+        ),
+        description="HMAC-SHA256 signing key for session cookies and CSRF tokens (override via RESUMEPROOF_SECRET_KEY)"
+    )
     max_upload_size_bytes: int = Field(
         default=5 * 1024 * 1024,
         description="Maximum allowed upload file size in bytes (5MB)"
+    )
+    max_resume_pages: int = Field(
+        default=5,
+        description="Maximum allowed PDF pages for a resume document (default 5; rejects long reports/theses)"
+    )
+    max_resume_lines: int = Field(
+        default=500,
+        description="Maximum allowed lines for a plaintext or markdown resume document"
     )
 
 

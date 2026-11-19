@@ -7,7 +7,7 @@ from resumeproof.schemas.claims import Claim
 from resumeproof.schemas.facts import ProfileFact, ProfileFactType
 from resumeproof.verifier.strict_verifier import StrictVerifier, KNOWN_TOOLS
 
-# Ground-truth verified claims and facts for demo candidate (Sanidhya baseline)
+# Ground-truth verified claims and facts for demo candidate (Jordan baseline)
 DEMO_CLAIMS = [
     Claim(id="c1", user_id="u", text="Built RESTful API microservices using FastAPI and SQLite.", tools=["FastAPI", "SQLite", "Python"]),
     Claim(id="c2", user_id="u", text="Trained defect inspection pipeline reaching 61.7% mAP50 on NEU-DET benchmark across 70/20/10 split.", tools=["PyTorch", "YOLO11", "Python"]),
@@ -16,9 +16,9 @@ DEMO_CLAIMS = [
 ]
 
 DEMO_FACTS = [
-    ProfileFact(id="f1", user_id="u", fact_type=ProfileFactType.NAME, value="Sanidhya Agrawal", is_confirmed=True),
+    ProfileFact(id="f1", user_id="u", fact_type=ProfileFactType.NAME, value="Jordan Hayes", is_confirmed=True),
     ProfileFact(id="f2", user_id="u", fact_type=ProfileFactType.DEGREE, value="Bachelor of Technology in Computer Science and Engineering", is_confirmed=True),
-    ProfileFact(id="f3", user_id="u", fact_type=ProfileFactType.EDUCATION_INSTITUTION, value="Medi-Caps University", is_confirmed=True),
+    ProfileFact(id="f3", user_id="u", fact_type=ProfileFactType.EDUCATION_INSTITUTION, value="Pacific Coast Institute of Technology", is_confirmed=True),
 ]
 
 # 20 tools outside KNOWN_TOOLS to verify open-world detection

@@ -3,6 +3,7 @@
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+import threading
 from typing import Generator, Optional
 import logging
 
@@ -101,8 +102,33 @@ CREATE TABLE IF NOT EXISTS interview_sessions (
     budget INTEGER NOT NULL,
     total_questions INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL,
+    current_question_json TEXT,
     started_at TEXT NOT NULL,
     completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    session_token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    active_interview_id TEXT,
+    client_ip TEXT,
+    user_agent TEXT,
+    created_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session_audit_logs (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    event_payload TEXT NOT NULL, -- JSON formatted details
+    severity TEXT NOT NULL DEFAULT 'INFO', -- 'INFO', 'WARN', 'SECURITY_ALERT'
+    client_ip TEXT,
+    user_agent TEXT,
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY(session_id) REFERENCES interview_sessions(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS session_turns (
@@ -140,6 +166,10 @@ CREATE INDEX IF NOT EXISTS idx_answers_claim ON answer_records(claim_id);
 CREATE INDEX IF NOT EXISTS idx_rubrics_project ON rubrics(project_id);
 CREATE INDEX IF NOT EXISTS idx_turns_session ON session_turns(session_id);
 CREATE INDEX IF NOT EXISTS idx_turns_claim ON session_turns(claim_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_session ON session_audit_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON session_audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_event ON session_audit_logs(event_type);
 """
 
 class Database:
@@ -147,6 +177,7 @@ class Database:
         self.is_memory = str(db_path) == ":memory:"
         self.db_path = Path(db_path)
         self._shared_conn: Optional[sqlite3.Connection] = None
+        self._write_lock = threading.RLock()
         if not self.is_memory:
             self.db_path.parent.mkdir(parents=True, exist_ok=True)
         else:
@@ -158,28 +189,35 @@ class Database:
     def get_connection(self) -> sqlite3.Connection:
         if self.is_memory and self._shared_conn is not None:
             return self._shared_conn
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA busy_timeout = 30000;")
         return conn
 
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Connection, None, None]:
-        conn = self.get_connection()
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            if not self.is_memory:
-                conn.close()
+        with self._write_lock:
+            conn = self.get_connection()
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                if not self.is_memory:
+                    conn.close()
 
     def init_schema(self) -> None:
         with self.transaction() as conn:
             conn.executescript(SCHEMA_SQL)
+            # Automatic schema migration for existing databases
+            try:
+                conn.execute("ALTER TABLE interview_sessions ADD COLUMN current_question_json TEXT;")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
         logger.debug(f"Initialized database schema at {self.db_path}")
 
     def close(self) -> None:

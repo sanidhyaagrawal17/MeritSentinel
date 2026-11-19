@@ -8,7 +8,7 @@ from resumeproof.core.db import Database
 from resumeproof.core.llm import FakeLLMClient
 from tests.fixtures.demo_fixtures import DEMO_FIXTURES
 from resumeproof.ui.app import app, init_app_services
-from resumeproof.schemas.claims import ClaimStatus
+from resumeproof.schemas.claims import ClaimStatus, ClaimType
 
 @pytest.fixture
 def test_client(tmp_path: Path):
@@ -27,7 +27,7 @@ def test_home_page(test_client: TestClient):
     """GET / renders home page with demo persona selector and upload form."""
     resp = test_client.get("/")
     assert resp.status_code == 200
-    assert "ResumeProof" in resp.text
+    assert ("ResumeProof" in resp.text or "MeritSentinel" in resp.text)
     assert "Adversarial Technical Verification" in resp.text
     assert "Sam Okafor" in resp.text
     assert "Alex Rivera" in resp.text
@@ -80,6 +80,84 @@ def test_confirm_and_reject_claim_actions(test_client: TestClient):
 
     c0_updated2 = claim_store.get_claim(c0.id)
     assert c0_updated2.status == ClaimStatus.REJECTED
+
+    # Reset claim back to pending (Undo)
+    reset_resp = test_client.post(
+        "/review/u_actions/reset_claim",
+        data={"claim_id": c0.id, "persona": "sam_okafor"},
+    )
+    assert reset_resp.status_code == 200
+    assert "Pending" in reset_resp.text
+
+    c0_updated3 = claim_store.get_claim(c0.id)
+    assert c0_updated3.status == ClaimStatus.EXTRACTED
+
+    # Test individual profile fact confirm and undo (reject_fact)
+    facts = claim_store.get_profile_facts(user_id="u_actions")
+    assert len(facts) > 0
+    f0 = facts[0]
+    confirm_f_resp = test_client.post(
+        "/review/u_actions/confirm_fact",
+        data={"fact_id": f0.id},
+    )
+    assert confirm_f_resp.status_code == 200
+    assert "Confirmed" in confirm_f_resp.text
+    assert "Undo" in confirm_f_resp.text
+    assert claim_store.get_profile_fact(f0.id).is_confirmed is True
+
+    undo_f_resp = test_client.post(
+        "/review/u_actions/reject_fact",
+        data={"fact_id": f0.id},
+    )
+    assert undo_f_resp.status_code == 200
+    assert "Pending" in undo_f_resp.text
+    assert "Confirm" in undo_f_resp.text
+    assert claim_store.get_profile_fact(f0.id).is_confirmed is False
+
+    # Test bulk confirm all facts and reset all facts (Undo All Facts)
+    test_client.post("/review/u_actions/confirm_all_facts")
+    for f in claim_store.get_profile_facts(user_id="u_actions"):
+        assert f.is_confirmed is True
+
+    test_client.post("/review/u_actions/reset_all_facts")
+    for f in claim_store.get_profile_facts(user_id="u_actions"):
+        assert f.is_confirmed is False
+
+    # Test 3-way toggle on skill badge: Pending -> Confirmed -> Rejected -> Pending
+    skills = [c for c in claims if c.claim_type == ClaimType.SKILL]
+    if skills:
+        s0 = skills[0]
+        # Step 1: Pending -> Confirmed
+        t1 = test_client.post("/review/u_actions/toggle_skill", data={"claim_id": s0.id})
+        assert t1.status_code == 200
+        assert "skill-badge active" in t1.text
+        assert claim_store.get_claim(s0.id).status == ClaimStatus.CONFIRMED
+
+        # Step 2: Confirmed -> Rejected
+        t2 = test_client.post("/review/u_actions/toggle_skill", data={"claim_id": s0.id})
+        assert t2.status_code == 200
+        assert "skill-badge inactive" in t2.text
+        assert claim_store.get_claim(s0.id).status == ClaimStatus.REJECTED
+
+        # Step 3: Rejected -> Pending
+        t3 = test_client.post("/review/u_actions/toggle_skill", data={"claim_id": s0.id})
+        assert t3.status_code == 200
+        assert "skill-badge pending" in t3.text
+        assert claim_store.get_claim(s0.id).status == ClaimStatus.EXTRACTED
+
+    # Test project bulk confirm and undo (reset_project)
+    project_claims = [c for c in claims if c.project_id and c.claim_type != ClaimType.SKILL]
+    if project_claims:
+        proj_id = project_claims[0].project_id
+        test_client.post("/review/u_actions/confirm_project", data={"project_id": proj_id})
+        for c in claim_store.get_claims(user_id="u_actions"):
+            if c.project_id == proj_id and c.claim_type != ClaimType.SKILL:
+                assert c.status == ClaimStatus.CONFIRMED
+
+        test_client.post("/review/u_actions/reset_project", data={"project_id": proj_id})
+        for c in claim_store.get_claims(user_id="u_actions"):
+            if c.project_id == proj_id and c.claim_type != ClaimType.SKILL:
+                assert c.status == ClaimStatus.EXTRACTED
 
 def test_full_interview_and_dashboard_flow(test_client: TestClient):
     """Tests the full mock interview loop: start session, get question, answer, poll grade, and dashboard."""
@@ -316,5 +394,202 @@ def test_tailor_pdf_export_blocked_when_unverified(test_client: TestClient):
     assert resp_md.status_code == 400
     assert "Export blocked" in resp_md.json()["detail"]
     assert "failed strict verification" in resp_md.json()["detail"]
+
+
+def test_interview_question_rephrase_flow(test_client: TestClient):
+    """POST /interview/{session_id}/rephrase returns simplified question with HTMX swap and preserves state."""
+    # 1. Upload demo candidate and confirm all claims
+    test_client.post("/upload", data={"user_id": "u_rephrase_test", "persona": "sam_okafor"})
+    claim_store = test_client.app.state.services["claim_store"]
+    for c in claim_store.get_claims(user_id="u_rephrase_test"):
+        test_client.post(
+            "/review/u_rephrase_test/confirm_claim",
+            data={"claim_id": c.id, "persona": "sam_okafor"},
+        )
+
+    # 2. Start interview
+    start_resp = test_client.post(
+        "/review/u_rephrase_test/start_interview",
+        data={"persona": "sam_okafor"},
+        follow_redirects=False,
+    )
+    assert start_resp.status_code == 303
+    session_url = start_resp.headers["location"]
+    session_id = session_url.split("/interview/")[-1]
+
+    # 3. Load initial interview room
+    room_resp = test_client.get(session_url)
+    assert room_resp.status_code == 200
+    assert "btn-rephrase-question" in room_resp.text
+    assert "active-question-container" in room_resp.text
+
+    # Extract original question text
+    session_store = test_client.app.state.services["session_store"]
+    session_before = session_store.get_session(session_id)
+    assert session_before.current_question is not None
+    original_text = session_before.current_question.question_text
+
+    # 4. Trigger rephrase via HTMX POST
+    rephrase_resp = test_client.post(
+        f"/interview/{session_id}/rephrase",
+        headers={"HX-Request": "true"},
+    )
+    assert rephrase_resp.status_code == 200
+    assert "active-question-container" in rephrase_resp.text
+    assert "Rephrased for Clarity" in rephrase_resp.text
+    assert "Show original phrasing" in rephrase_resp.text
+
+    # Verify session store was updated
+    session_after = session_store.get_session(session_id)
+    assert session_after.current_question is not None
+    assert session_after.current_question.is_rephrased is True
+    assert session_after.current_question.original_question_text == original_text
+
+    # 5. Fallback GET returns 303 redirect
+    get_resp = test_client.get(f"/interview/{session_id}/rephrase", follow_redirects=False)
+    assert get_resp.status_code == 303
+
+
+def test_upload_multipage_report_rejected_with_400(test_client: TestClient, tmp_path: Path):
+    """POST /upload rejects documents exceeding max resume page limit (e.g. 35 pages) with HTTP 400."""
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    for _ in range(12):  # 12 pages exceeds max_resume_pages=5 limit
+        writer.add_blank_page(width=612, height=792)
+    pdf_file = tmp_path / "research_report.pdf"
+    with open(pdf_file, "wb") as f:
+        writer.write(f)
+
+    with open(pdf_file, "rb") as f:
+        resp = test_client.post(
+            "/upload",
+            data={"user_id": "u_report_test"},
+            files={"file": ("research_report.pdf", f, "application/pdf")},
+            follow_redirects=False,
+        )
+
+    assert resp.status_code == 400
+    assert "exceeds maximum resume page limit" in resp.json()["detail"].lower()
+    assert "12 pages" in resp.json()["detail"]
+
+
+def test_rephrase_then_answer_advances_to_different_question(test_client: TestClient):
+    """Answering a rephrased question advances session to a distinct subsequent question without repetition."""
+    # 1. Upload demo candidate and confirm claims
+    test_client.post("/upload", data={"user_id": "u_distinct_flow", "persona": "sam_okafor"})
+    claim_store = test_client.app.state.services["claim_store"]
+    for c in claim_store.get_claims(user_id="u_distinct_flow"):
+        test_client.post(
+            "/review/u_distinct_flow/confirm_claim",
+            data={"claim_id": c.id, "persona": "sam_okafor"},
+        )
+
+    # 2. Start interview
+    start_resp = test_client.post(
+        "/review/u_distinct_flow/start_interview",
+        data={"persona": "sam_okafor"},
+        follow_redirects=False,
+    )
+    session_url = start_resp.headers["location"]
+    session_id = session_url.split("/interview/")[-1]
+
+    # 3. Load question 1
+    test_client.get(session_url)
+    session_store = test_client.app.state.services["session_store"]
+    s1 = session_store.get_session(session_id)
+    q1 = s1.current_question
+    assert q1 is not None
+
+    # 4. Rephrase question 1
+    rephrase_resp = test_client.post(
+        f"/interview/{session_id}/rephrase",
+        headers={"HX-Request": "true"},
+    )
+    assert rephrase_resp.status_code == 200
+    s1_rephrased = session_store.get_session(session_id)
+    q1_rephrased = s1_rephrased.current_question
+    assert q1_rephrased.is_rephrased is True
+
+    # 5. Submit candidate answer (e.g., stating no knowledge)
+    ans_resp = test_client.post(
+        f"/interview/{session_id}/answer",
+        data={
+            "question_id": q1_rephrased.id,
+            "claim_id": q1_rephrased.claim_id,
+            "priority": q1_rephrased.priority.value,
+            "question_text": q1_rephrased.question_text,
+            "is_followup": "0",
+            "rubric_id": q1_rephrased.rubric_id or "",
+            "project_id": q1_rephrased.project_id or "",
+            "answer_text": "I do not know or have no idea about this specific module.",
+        },
+        follow_redirects=False,
+    )
+    assert ans_resp.status_code == 303
+
+    # 6. Fetch next question in room
+    room_resp = test_client.get(session_url)
+    assert room_resp.status_code == 200
+
+    s2 = session_store.get_session(session_id)
+    q2 = s2.current_question
+    assert q2 is not None
+
+    # Assert question 2 is NOT identical to question 1 or rephrased question 1
+    assert q2.id != q1.id
+    assert q2.id != q1_rephrased.id
+    assert q2.question_text.strip() != q1.question_text.strip()
+    assert q2.question_text.strip() != q1_rephrased.question_text.strip()
+
+
+def test_claim_edit_xss_escaped(test_client: TestClient):
+    """Inline claim edit and partial swap escape HTML/script payloads via Jinja2 autoescaping."""
+    test_client.post("/upload", data={"user_id": "u_xss_test", "persona": "sam_okafor"})
+    claim_store = test_client.app.state.services["claim_store"]
+    c0 = claim_store.get_claims(user_id="u_xss_test")[0]
+
+    payload = "<script>alert('xss')</script> Built API"
+    save_resp = test_client.post(
+        "/review/u_xss_test/save_claim_edit",
+        data={"claim_id": c0.id, "edited_text": payload, "persona": "sam_okafor"},
+    )
+    assert save_resp.status_code == 200
+    assert "<script>" not in save_resp.text
+    assert "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;" in save_resp.text
+
+
+def test_upload_browser_html_error_banner(test_client: TestClient):
+    """Browser form uploads with Accept: text/html render styled error banner instead of raw JSON."""
+    resp = test_client.post(
+        "/upload",
+        data={"user_id": "u_bad_ext"},
+        files={"file": ("malware.exe", b"MZ...", "application/octet-stream")},
+        headers={"Accept": "text/html,application/xhtml+xml"},
+    )
+    assert resp.status_code == 400
+    assert "Upload Rejected:" in resp.text
+    assert "Unsupported file type" in resp.text
+
+
+def test_grade_status_triggers_hx_refresh_when_done(test_client: TestClient):
+    """grade_status with was_pending=1 emits HX-Refresh header when all turns are graded."""
+    test_client.post("/upload", data={"user_id": "u_refresh_test", "persona": "sam_okafor"})
+    claim_store = test_client.app.state.services["claim_store"]
+    for c in claim_store.get_claims(user_id="u_refresh_test"):
+        test_client.post("/review/u_refresh_test/confirm_claim", data={"claim_id": c.id})
+    start_resp = test_client.post(
+        "/review/u_refresh_test/start_interview",
+        data={"persona": "sam_okafor"},
+        follow_redirects=False,
+    )
+    session_id = start_resp.headers["location"].split("/interview/")[-1]
+    resp = test_client.get(f"/interview/{session_id}/grade_status?was_pending=1")
+    assert resp.status_code == 200
+    assert "All Turns Graded" in resp.text
+    assert resp.headers.get("HX-Refresh") == "true"
+
+
+
 
 

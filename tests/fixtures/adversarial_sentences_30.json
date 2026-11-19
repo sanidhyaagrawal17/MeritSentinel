@@ -121,7 +121,7 @@
   {
     "id": "adv_18",
     "category": "role_overclaim",
-    "sentence": "- Senior Teaching Fellow at CM RISE School supervising curriculum development.",
+    "sentence": "- Senior Teaching Fellow at Summit Academy School supervising curriculum development.",
     "expected_status": "BLOCKED",
     "notes": "Fabricated senior title"
   },
@@ -142,7 +142,7 @@
   {
     "id": "adv_21",
     "category": "fabricated_fact",
-    "sentence": "Medi-Caps University - Bachelor of Technology in Computer Science (CGPA: 9.4 / 10.0)",
+    "sentence": "Pacific Coast Institute of Technology - Bachelor of Technology in Computer Science (CGPA: 9.4 / 10.0)",
     "expected_status": "BLOCKED",
     "notes": "Inflated CGPA (candidate is 7.3)"
   },

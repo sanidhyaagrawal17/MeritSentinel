@@ -37,7 +37,7 @@ class GapReport:
     @property
     def defensibility_ratio(self) -> float:
         if self.total_requirements == 0:
-            return 1.0
+            return 0.0
         return len(self.matched_and_defensible) / self.total_requirements
 
 
@@ -86,15 +86,16 @@ class TailoringEngine:
         All other claims must be confirmed AND meet mastery thresholds.
         """
         ctype_val = getattr(claim.claim_type, "value", str(claim.claim_type)).lower()
+        approved_statuses = (ClaimStatus.CONFIRMED, ClaimStatus.EDITED)
         if ctype_val == "tool" and claim.project_id:
-            if claim.status == ClaimStatus.CONFIRMED:
+            if claim.status in approved_statuses:
                 return True
             if all_claims and mastery_map:
                 for other in all_claims:
                     if other.project_id == claim.project_id and other.id != claim.id:
                         other_m = mastery_map.get(other.id)
                         if (
-                            other.status == ClaimStatus.CONFIRMED
+                            other.status in approved_statuses
                             and other_m is not None
                             and other_m.effective_score >= self.score_threshold
                             and other_m.confidence >= self.confidence_threshold
@@ -103,7 +104,7 @@ class TailoringEngine:
             return False
 
         # Standard claims (metrics, experience, skills)
-        if claim.status != ClaimStatus.CONFIRMED:
+        if claim.status not in approved_statuses:
             return False
         if mastery is None:
             return False
@@ -167,6 +168,11 @@ class TailoringEngine:
                 is_eligible = self.is_claim_eligible(best_claim, m_state, all_claims=claims, mastery_map=mastery_map)
 
                 if is_eligible:
+                    reason_text = (
+                        f"Verified defensible with effective score {m_state.effective_score:.2f} >= {self.score_threshold}."
+                        if m_state is not None
+                        else "Confirmed project tool claim verified via review/parent project."
+                    )
                     gap_report.matched_and_defensible.append(RequirementGap(
                         requirement_text=req,
                         status="matched_and_defensible",
@@ -175,7 +181,7 @@ class TailoringEngine:
                         effective_score=m_state.effective_score if m_state else None,
                         confidence=m_state.confidence if m_state else None,
                         match_score=best_score,
-                        reason=f"Verified defensible with effective score {m_state.effective_score:.2f} >= {self.score_threshold}.",
+                        reason=reason_text,
                     ))
                 else:
                     curr_score = m_state.effective_score if m_state else 0.0

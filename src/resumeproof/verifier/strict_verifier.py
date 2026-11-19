@@ -23,7 +23,8 @@ KNOWN_TOOLS = [
     "LightGBM", "PyTorch", "TensorFlow", "Scikit-Learn", "Jepsen", "Locust",
     "ONNX Runtime", "Ultralytics YOLO11", "YOLO11", "NetworkX", "Cisco Meraki API",
     "JWT", "JSON-RPC 2.0", "JSON-RPC", "Model Context Protocol", "MCP",
-    "ChromaDB", "Next.js", "Next.js 14", "Pydantic", "Postman", "Git", "GitHub",
+    "ChromaDB", "Next.js", "Next.js 14", "Pydantic", "Postman", "Git", "GitHub", "pytest",
+    "OpenCV", "MediaPipe", "Fernet", "PBKDF2", "REST APIs", "RESTful APIs",
     "Apache Spark", "Spark", "Databricks", "Snowflake", "BigQuery",
     "Jenkins", "Milvus", "TensorRT", "BGP", "CUDA", "Google Antigravity (Gemini)", "Google Antigravity", "Gemini",
 ]

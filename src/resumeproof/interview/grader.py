@@ -1,6 +1,7 @@
 """Grader using qwen2.5:7b, temperature 0, atomic rubric points, and deterministic scoring."""
 
 import time
+import logging
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -8,6 +9,8 @@ from resumeproof.core.config import settings
 from resumeproof.core.llm import LLMClient
 from resumeproof.schemas.claims import Claim
 from resumeproof.schemas.rubric import RubricItem, AtomicPoint
+
+logger = logging.getLogger("resumeproof.interview.grader")
 from resumeproof.schemas.interview import GradeResult, PointEvaluation
 
 class PointEvaluationItem(BaseModel):
@@ -60,206 +63,165 @@ CRITICAL EVALUATION RULES:
 
 
 
-NUMERIC_ALIAS_PAIRS = [
-    ("0.9999", ["99.99%", "99.99 percent", "99.99"]),
-    ("99.99%", ["0.9999"]),
-    ("0.999", ["99.9%", "99.9 percent"]),
-    ("99.9%", ["0.999"]),
-    ("0.99", ["99%", "99 percent"]),
-    ("99%", ["0.99"]),
-    ("[150, 300]", ["150-300ms", "150-300 ms", "150 to 300ms", "150 - 300ms", "150ms-300ms", "150 to 300 ms"]),
-    ("150-300", ["150-300ms", "150-300 ms", "150 to 300ms", "150 - 300ms", "150ms-300ms", "150 to 300 ms"]),
-    ("150-300ms", ["[150, 300]", "150 to 300ms", "150-300 ms"]),
+GENERAL_TECHNICAL_ALIASES: list[tuple[str, list[str]]] = [
     ("dict", ["dictionary", "dictionaries"]),
     ("dictionary", ["dict", "dicts"]),
-    ("61.7%", ["0.617", "61.7 percent"]),
-    ("0.617", ["61.7%", "61.7 percent", "0.617 mAP@0.5", "0.617 mAP50"]),
-    ("62.2%", ["0.622", "62.2 percent"]),
-    ("0.622", ["62.2%", "62.2 percent"]),
-    ("61.2%", ["0.612", "61.2 percent"]),
-    ("0.612", ["61.2%", "61.2 percent"]),
-    ("57.3%", ["0.573", "57.3 percent"]),
-    ("0.573", ["57.3%", "57.3 percent"]),
-    ("1.6ms", ["1.6 ms", "1.6 milliseconds"]),
-    ("1.6 ms", ["1.6ms", "1.6 milliseconds"]),
-    ("416x416", ["416 x 416", "416 × 416", "416 by 416"]),
-    ("416 by 416", ["416x416", "416 x 416", "416 × 416"]),
-    ("12-byte", ["12-octet", "12 octet", "twelve-byte", "twelve-octet", "12 bytes", "twelve bytes"]),
-    ("12-octet", ["12-byte", "12 byte", "twelve-byte", "twelve-octet", "12 bytes", "twelve bytes"]),
-    ("twelve-byte", ["12-byte", "12-octet", "12 byte", "12 octet"]),
-    ("0.35k", ["350", "350 req/sec", "350 ops/sec", "three hundred and fifty"]),
-    ("350", ["0.35k", "350 req/sec", "0.35k read ops/sec", "three hundred and fifty"]),
-    ("four-head", ["4-head", "4 head", "four head"]),
-    ("4-head", ["four-head", "four head", "4 head"]),
-    ("0.0016s", ["1.6ms", "1.6 ms", "1.6 milliseconds"]),
-    ("WAL", ["Write-Ahead Logging", "Write-Ahead Log", "WAL persistence", "WAL mode"]),
-    ("Write-Ahead Logging", ["WAL", "Write-Ahead Log", "WAL persistence", "WAL mode"]),
-    ("seventy/twenty/ten", ["70/20/10", "70% train, 20% val, 10% test"]),
-    ("70/20/10", ["seventy/twenty/ten", "70% train, 20% val, 10% test"]),
+    ("wal", ["write-ahead logging", "write-ahead log", "wal mode", "wal persistence"]),
+    ("write-ahead logging", ["wal", "write-ahead log", "wal mode", "wal persistence"]),
+    ("byte", ["octet", "bytes", "octets"]),
+    ("octet", ["byte", "bytes", "octets"]),
 ]
 
-def check_deterministic_point_match(pt: AtomicPoint, answer_text: str) -> Optional[str]:
-    """Deterministically checks if an atomic rubric point is satisfied in answer_text.
 
-    Provides robust normalization for numeric, unit, and technical variants:
-    - 0.35k ops/sec = 350 ops/sec
-    - 12-octet = 12 bytes
-    - 0.617 mAP50 = 61.7% mAP50
-    - four-head = 4-head
-    - 0.0016s = 1.6ms
-    - seventy/twenty/ten = 70/20/10
-    - Write-Ahead Logging = WAL mode
-    """
+def _search_token_boundary(pattern: str, text: str) -> Optional[str]:
     import re
-    ans_clean = answer_text.strip()
-    pt_combined = f"{pt.text} {pt.source_quote}".lower()
+    m = re.search(rf"(?<![a-zA-Z0-9_]){re.escape(pattern)}(?![a-zA-Z0-9_])", text, re.IGNORECASE)
+    return text[m.start():m.end()] if m else None
 
-    # 1. SQLite WAL mode
-    if any(k in pt_combined for k in ["sqlite wal", "wal mode", "write-ahead logging"]):
-        m = re.search(r"\b(write-ahead logging|wal persistence|wal mode|journal mode to write-ahead logging)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 2. 10 connections / connection pooling
-    if any(k in pt_combined for k in ["connection pool", "10 connections", "pool_size=10"]):
-        m = re.search(r"\b(pool of ten connections|capped connections at ten|pool of 10 connections|10 connections|pool_size=10)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 3. 350 concurrent read req/sec
-    if any(k in pt_combined for k in ["350 concurrent read req/sec", "350 read req/sec", "350"]):
-        m = re.search(r"\b(0\.35k read ops/sec|0\.35k ops/sec|three hundred and fifty queries per second|350 queries per second|350 concurrent read req/sec|350 read req/sec)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 4. 12-byte DNS headers
-    if any(k in pt_combined for k in ["12-byte", "12-octet", "dns header"]):
-        m = re.search(r"\b(12-octet header|12-octet dns header|12-octet|twelve-byte dns header|twelve-byte header|12-byte dns header|12-byte header)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 5. A and CNAME records
-    if any(k in pt_combined for k in ["a and cname", "parsed a and cname", "cname"]):
-        m = re.search(r"\b(resolved both a-type and cname alias records|address \(a\) mapping and canonical name \(cname\) redirects|host address records and canonical name aliases|a and cname|a/cname)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 6. RFC 1035 wire specification
-    if any(k in pt_combined for k in ["rfc 1035", "rfc1035"]):
-        m = re.search(r"\b(rfc 1035 wire specifications|rfc 1035 specification|rfc 1035|rfc1035)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 7. 61.7% mAP50
-    if any(k in pt_combined for k in ["61.7% map50", "61.7%", "0.617"]):
-        m = re.search(r"\b(0\.617 map50|0\.617 map@0\.5|mean average precision of 0\.617|61\.7% map50|61\.7% map)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 8. NEU-DET benchmark
-    if any(k in pt_combined for k in ["neu-det"]):
-        m = re.search(r"\b(neu-det benchmark|neu-det defect dataset|neu-det surface defects|neu-det)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 9. 70/20/10 train/val/test split
-    if any(k in pt_combined for k in ["70/20/10", "split", "seventy/twenty/ten"]):
-        m = re.search(r"\b(seventy/twenty/ten percent distribution|70% train, 20% validation, and 10% test split|70/20/10 train/val/test split|70/20/10 split)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 10. 4-head P2 variant
-    if any(k in pt_combined for k in ["4-head p2", "four-head", "p2 variant", "p2"]):
-        m = re.search(r"\b(four-head architecture incorporating a p2|four-head p2 detection module|4-head p2 modification|4-head p2 variant|4-head p2)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 11. Validation gain (62.2% vs 61.2%)
-    if any(k in pt_combined for k in ["validation gain", "62.2%", "61.2%", "0.622", "0.612"]):
-        m = re.search(r"\b(validation gains reaching 62\.2% compared to 61\.2%|0\.622 versus 0\.612|62\.2% on val|62\.2% vs 61\.2%)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 12. Test drop to 57.3%
-    if any(k in pt_combined for k in ["test drop", "57.3%", "0.573"]):
-        m = re.search(r"\b(fell to 0\.573 on test|dropping to 57\.3%|dropped to 57\.3%)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 13. Exported to ONNX format
-    if any(k in pt_combined for k in ["onnx"]):
-        m = re.search(r"\b(onnx open runtime format|onnx format|onnx graph format|onnx)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 14. AWS EC2 Tesla T4
-    if any(k in pt_combined for k in ["aws ec2", "tesla t4", "t4"]):
-        m = re.search(r"\b(aws ec2 instance featuring a tesla t4|aws ec2 node equipped with a tesla t4|aws ec2 t4|aws ec2 tesla t4)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    # 15. 1.6ms execution latency
-    if any(k in pt_combined for k in ["1.6ms", "latency", "frame time"]):
-        m = re.search(r"\b(0\.0016s per 416-pixel frame|1\.6ms per frame|1\.6ms|1\.6 ms)\b", ans_clean, re.IGNORECASE)
-        if m:
-            return ans_clean[m.start():m.end()]
-
-    return None
 
 def resolve_alias_or_numeric_quote(cand_quote: str, answer_text: str) -> Optional[str]:
-    """Resolves numeric and technical aliases (e.g. 0.9999 <-> 99.99%, [150, 300] <-> 150-300ms, dict <-> dictionary)."""
+    """Resolves numeric, unit, range, and general technical aliases dynamically against answer_text."""
     import re
+    from resumeproof.verifier.injection import normalize_words_to_numbers
+
     clean_q = cand_quote.strip().strip("\"'.,;:()")
     if not clean_q:
         return None
 
-    # Standalone match: if word is alphabetic, check word boundary first to avoid matching prefixes
+    # 1. Direct verbatim / case-insensitive match
     if clean_q.isalpha():
-        m = re.search(rf"\b{re.escape(clean_q)}\b", answer_text, re.IGNORECASE)
-        if m:
-            return answer_text[m.start():m.end()]
+        found = _search_token_boundary(clean_q, answer_text)
+        if found:
+            return found
     elif clean_q in answer_text:
         return clean_q
     elif clean_q.lower() in answer_text.lower():
         idx = answer_text.lower().find(clean_q.lower())
         return answer_text[idx : idx + len(clean_q)]
 
-    # Flexible whitespace check between numbers and units (e.g. "1.6ms" <-> "1.6 ms")
+    # 2. Flexible whitespace between numbers and units (e.g. "1.6ms" <-> "1.6 ms")
     try:
         flex_pat = re.sub(r"(\d)\s*([a-zA-Z%])", r"\1\\s*\2", re.escape(clean_q))
-        m = re.search(rf"\b{flex_pat}\b", answer_text, re.IGNORECASE)
+        m = re.search(rf"(?<![a-zA-Z0-9_]){flex_pat}(?![a-zA-Z0-9_])", answer_text, re.IGNORECASE)
         if m:
             return answer_text[m.start():m.end()]
     except Exception:
         pass
 
-    for key, aliases in NUMERIC_ALIAS_PAIRS:
+    # 3. Decimal <-> Percentage & raw <-> k-suffix conversion
+    try:
+        val_float = float(clean_q)
+        if 0.0 < val_float < 1.0:
+            pct = round(val_float * 100.0, 6)
+            for ps in (f"{pct:g}%", f"{pct:g} percent", f"{pct:g}"):
+                found = _search_token_boundary(ps, answer_text)
+                if found:
+                    return found
+        elif val_float >= 100.0:
+            k_val = round(val_float / 1000.0, 6)
+            found = _search_token_boundary(f"{k_val:g}k", answer_text)
+            if found:
+                return found
+    except ValueError:
+        pass
+
+    if clean_q.endswith("%"):
+        try:
+            dec = round(float(clean_q[:-1]) / 100.0, 6)
+            found = _search_token_boundary(f"{dec:g}", answer_text)
+            if found:
+                return found
+        except ValueError:
+            pass
+
+    # 4. Milliseconds <-> Seconds conversion
+    ms_match = re.match(r"^(\d+(?:\.\d+)?)\s*ms$", clean_q, re.IGNORECASE)
+    if ms_match:
+        sec = round(float(ms_match.group(1)) / 1000.0, 9)
+        for ss in (f"{sec:g}s", f"{sec:g} s"):
+            found = _search_token_boundary(ss, answer_text)
+            if found:
+                return found
+
+    s_match = re.match(r"^(\d+(?:\.\d+)?)\s*s$", clean_q, re.IGNORECASE)
+    if s_match:
+        ms_val = round(float(s_match.group(1)) * 1000.0, 6)
+        for mss in (f"{ms_val:g}ms", f"{ms_val:g} ms"):
+            found = _search_token_boundary(mss, answer_text)
+            if found:
+                return found
+
+    # 5. k-suffix -> raw integer/float
+    k_match = re.match(r"^(\d+(?:\.\d+)?)\s*k$", clean_q, re.IGNORECASE)
+    if k_match:
+        raw_val = round(float(k_match.group(1)) * 1000.0, 6)
+        raw_str = f"{int(raw_val)}" if raw_val.is_integer() else f"{raw_val:g}"
+        found = _search_token_boundary(raw_str, answer_text)
+        if found:
+            return found
+
+    # 6. Bracket range [a, b] <-> a-b / a to b
+    bracket_match = re.match(r"^\[\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\]$", clean_q)
+    if bracket_match:
+        a, b = bracket_match.groups()
+        for ra in (f"{a}-{b}ms", f"{a}-{b} ms", f"{a}-{b}", f"{a} to {b}ms", f"{a} to {b} ms", f"{a} to {b}", f"{a} - {b}ms", f"{a} - {b}", f"{a}ms-{b}ms"):
+            found = _search_token_boundary(ra, answer_text)
+            if found:
+                return found
+
+    # 7. General technical alias table
+    for key, aliases in GENERAL_TECHNICAL_ALIASES:
         if clean_q.lower() == key.lower():
             for alt in aliases:
-                if alt.isalpha():
-                    m = re.search(rf"\b{re.escape(alt)}\b", answer_text, re.IGNORECASE)
-                    if m:
-                        return answer_text[m.start():m.end()]
-                elif alt.lower() in answer_text.lower():
-                    idx = answer_text.lower().find(alt.lower())
-                    return answer_text[idx : idx + len(alt)]
+                found = _search_token_boundary(alt, answer_text)
+                if found:
+                    return found
         for alt in aliases:
             if clean_q.lower() == alt.lower():
-                if key.isalpha():
-                    m = re.search(rf"\b{re.escape(key)}\b", answer_text, re.IGNORECASE)
-                    if m:
-                        return answer_text[m.start():m.end()]
-                elif key.lower() in answer_text.lower():
-                    idx = answer_text.lower().find(key.lower())
-                    return answer_text[idx : idx + len(key)]
+                found = _search_token_boundary(key, answer_text)
+                if found:
+                    return found
                 for alt2 in aliases:
-                    if alt2.isalpha():
-                        m = re.search(rf"\b{re.escape(alt2)}\b", answer_text, re.IGNORECASE)
-                        if m:
-                            return answer_text[m.start():m.end()]
-                    elif alt2.lower() in answer_text.lower():
-                        idx = answer_text.lower().find(alt2.lower())
-                        return answer_text[idx : idx + len(alt2)]
+                    found = _search_token_boundary(alt2, answer_text)
+                    if found:
+                        return found
+
+    # 8. Written English numbers fallback
+    try:
+        norm_ans = normalize_words_to_numbers(answer_text)
+        if norm_ans != answer_text:
+            found_norm = resolve_alias_or_numeric_quote(clean_q, norm_ans)
+            if found_norm and found_norm in answer_text:
+                return found_norm
+    except Exception:
+        pass
+
+    return None
+
+
+def check_deterministic_point_match(pt: AtomicPoint, answer_text: str) -> Optional[str]:
+    """Algorithmically checks if numeric, unit, range, or alias tokens from pt match answer_text."""
+    import re
+    ans_clean = answer_text.strip()
+    if not ans_clean:
+        return None
+    pt_combined = f"{pt.text} {pt.source_quote}"
+
+    candidates: list[str] = []
+    candidates.extend(re.findall(r"\[\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*\]", pt_combined))
+    candidates.extend(re.findall(r"\b\d+(?:\.\d+)?\s*(?:%|ms|s|k)\b", pt_combined, re.IGNORECASE))
+    candidates.extend(re.findall(r"\b(?:wal|write-ahead logging)\b", pt_combined, re.IGNORECASE))
+
+    seen: set[str] = set()
+    for tok in candidates:
+        low = tok.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        matched = resolve_alias_or_numeric_quote(tok, ans_clean)
+        if matched and matched in answer_text:
+            return matched
+
     return None
 
 def compute_deterministic_score(matched_count: int, total_count: int) -> int:
@@ -364,13 +326,26 @@ Supplied Ground-Truth Rubric Items & Atomic Points:
             {"role": "user", "content": user_content},
         ]
 
-        raw_grade = self.llm_client.structured_completion(
-            messages=messages,
-            schema=GradeStructuredPayload,
-            model=self.model,
-            temperature=0.0,
-            timeout=timeout,
-        )
+        try:
+            raw_grade = self.llm_client.structured_completion(
+                messages=messages,
+                schema=GradeStructuredPayload,
+                model=self.model,
+                temperature=0.0,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            if self.model != settings.interviewer_model and ("404" in str(exc) or "not found" in str(exc).lower()):
+                logger.warning(f"Grader model '{self.model}' unavailable ({exc}); falling back to '{settings.interviewer_model}'.")
+                raw_grade = self.llm_client.structured_completion(
+                    messages=messages,
+                    schema=GradeStructuredPayload,
+                    model=settings.interviewer_model,
+                    temperature=0.0,
+                    timeout=timeout,
+                )
+            else:
+                raise
 
         latency_ms = (time.perf_counter() - start_time) * 1000.0
 
@@ -462,7 +437,7 @@ Supplied Ground-Truth Rubric Items & Atomic Points:
         elif validated.evidence_quote and validated.evidence_quote in answer_text:
             final_evidence_quote = validated.evidence_quote
         else:
-            final_evidence_quote = answer_text[:120] if raw_score == 0 else ""
+            final_evidence_quote = ""
 
         # Construct critique strictly citing atomic rubric points and answer quotes
         # Guarantees no demands for unmentioned trade-offs, constraints, or alternatives

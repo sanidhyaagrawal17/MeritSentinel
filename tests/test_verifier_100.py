@@ -16,15 +16,15 @@ from resumeproof.verifier.strict_verifier import StrictVerifier
 @pytest.fixture
 def test_candidate_profile():
     facts = [
-        ProfileFact(id="f1", user_id="u1", fact_type=ProfileFactType.NAME, value="Sanidhya Agrawal", is_confirmed=True),
-        ProfileFact(id="f2", user_id="u1", fact_type=ProfileFactType.EMAIL, value="sanidhyaagrawal2005@gmail.com", is_confirmed=True),
-        ProfileFact(id="f3", user_id="u1", fact_type=ProfileFactType.PHONE, value="+91-8305747257", is_confirmed=True),
-        ProfileFact(id="f4", user_id="u1", fact_type=ProfileFactType.LOCATION, value="Indore, Madhya Pradesh, India", is_confirmed=True),
-        ProfileFact(id="f5", user_id="u1", fact_type=ProfileFactType.EDUCATION_INSTITUTION, value="Medi-Caps University", is_confirmed=True),
+        ProfileFact(id="f1", user_id="u1", fact_type=ProfileFactType.NAME, value="Jordan Hayes", is_confirmed=True),
+        ProfileFact(id="f2", user_id="u1", fact_type=ProfileFactType.EMAIL, value="jordan.hayes@example.com", is_confirmed=True),
+        ProfileFact(id="f3", user_id="u1", fact_type=ProfileFactType.PHONE, value="+1-555-0199", is_confirmed=True),
+        ProfileFact(id="f4", user_id="u1", fact_type=ProfileFactType.LOCATION, value="Seattle, Washington, USA", is_confirmed=True),
+        ProfileFact(id="f5", user_id="u1", fact_type=ProfileFactType.EDUCATION_INSTITUTION, value="Pacific Coast Institute of Technology", is_confirmed=True),
         ProfileFact(id="f6", user_id="u1", fact_type=ProfileFactType.DEGREE, value="Bachelor of Technology in Computer Science and Engineering", is_confirmed=True),
         ProfileFact(id="f7", user_id="u1", fact_type=ProfileFactType.CGPA, value="7.3 / 10.0", is_confirmed=True),
         ProfileFact(id="f8", user_id="u1", fact_type=ProfileFactType.GRADUATION_DATE, value="Expected June 2027", is_confirmed=True),
-        ProfileFact(id="f9", user_id="u1", fact_type=ProfileFactType.EMPLOYER_NAME, value="CM RISE Maharaja Shivaji Rao School", is_confirmed=True),
+        ProfileFact(id="f9", user_id="u1", fact_type=ProfileFactType.EMPLOYER_NAME, value="Summit Academy STEM Lab", is_confirmed=True),
         ProfileFact(id="f10", user_id="u1", fact_type=ProfileFactType.EMPLOYMENT_DATES, value="13 Jul 2026 - 5 Aug 2026", is_confirmed=True),
     ]
 
@@ -79,7 +79,7 @@ def test_100_sentences_strict_verifier_evaluation(test_candidate_profile):
     # 1. Fifty Verified Sentences (Grounded in Candidate Profile)
     valid_sentences = [
         # Structural Headings
-        "# Sanidhya Agrawal",
+        "# Jordan Hayes",
         "## EDUCATION",
         "## EXPERIENCE",
         "## VERIFIED PROJECTS",
@@ -89,10 +89,10 @@ def test_100_sentences_strict_verifier_evaluation(test_candidate_profile):
         "### Netpass Gateway",
         "### Aerosentinel",
         # Contact / Education Facts
-        "Indore, Madhya Pradesh, India | sanidhyaagrawal2005@gmail.com | +91-8305747257",
-        "**Medi-Caps University** - Expected June 2027",
+        "Seattle, Washington, USA | jordan.hayes@example.com | +1-555-0199",
+        "**Pacific Coast Institute of Technology** - Expected June 2027",
         "Bachelor of Technology in Computer Science and Engineering (CGPA: 7.3 / 10.0)",
-        "**CM RISE Maharaja Shivaji Rao School** (13 Jul 2026 - 5 Aug 2026)",
+        "**Summit Academy STEM Lab** (13 Jul 2026 - 5 Aug 2026)",
         # Project Bullets (Exact & Paraphrased)
         "- Built a JSON-RPC 2.0 stdio MCP server exposing 4 analytical query tools over a relational sales database with structured telemetry.",
         "- Implemented dual-layer SQL security: configured SQLite read-only URI access (?mode=ro) and a lexical SQL validator blocking non-SELECT queries and capping results to 50 rows.",

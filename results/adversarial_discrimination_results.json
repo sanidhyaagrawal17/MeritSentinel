@@ -1,0 +1,234 @@
+{
+  "date": "2026-10-28",
+  "evaluator_model": "qwen2.5:7b",
+  "total_adversarial_cases": 25,
+  "zero_score_count": 13,
+  "adversarial_rejection_rate": 0.52,
+  "items": {
+    "item_1_sqlite_wal": {
+      "title": "SQLite WAL mode & connection pooling (350 req/sec)",
+      "cases": [
+        {
+          "case_type": "right_numbers_wrong_subject",
+          "answer": "We tuned an ONNX Runtime GPU inference pipeline to achieve 350 frames per second on an AWS EC2 Tesla T4 instance with pool size 10.",
+          "score": 0,
+          "evidence_quote": "We tuned an ONNX Runtime GPU inference pipeline to achieve 350 frames per second on an AWS EC2 Tesla T4 instance with po",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Configured SQLite journal mode to Write-Ahead Logging (WAL)'; Point 'Configured connection pooling (e.g. pool_size=10 in SQLAlchemy)'; Point 'Sustained 350 concurrent read requests per second benchmark'; Point 'Maintained sub-50ms p95 latency without database lock errors'.",
+          "latency_ms": 7192.54
+        },
+        {
+          "case_type": "correct_subject_wrong_numbers",
+          "answer": "We configured SQLite in WAL mode with connection pooling, scaling to 50,000 requests per second with a pool size of 500 connections.",
+          "score": 1,
+          "evidence_quote": "WAL mode",
+          "feedback": "Partial technical match. Verified: Point 'Configured SQLite journal mode to Write-Ahead Logging (WAL)' verified by \"WAL mode\". Missed atomic points: Point 'Configured connection pooling (e.g. pool_size=10 in SQLAlchemy)'; Point 'Sustained 350 concurrent read requests per second benchmark'; Point 'Maintained sub-50ms p95 latency without database lock errors'.",
+          "latency_ms": 7035.1
+        },
+        {
+          "case_type": "contradictory_statements",
+          "answer": "We enabled SQLite WAL mode which completely disables connection pooling and locks out all concurrent readers causing 0 req/sec.",
+          "score": 1,
+          "evidence_quote": "WAL mode",
+          "feedback": "Partial technical match. Verified: Point 'Configured SQLite journal mode to Write-Ahead Logging (WAL)' verified by \"WAL mode\". Missed atomic points: Point 'Configured connection pooling (e.g. pool_size=10 in SQLAlchemy)'; Point 'Sustained 350 concurrent read requests per second benchmark'; Point 'Maintained sub-50ms p95 latency without database lock errors'.",
+          "latency_ms": 7308.08
+        },
+        {
+          "case_type": "one_word_answer",
+          "answer": "SQLite",
+          "score": 0,
+          "evidence_quote": "SQLite",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Configured SQLite journal mode to Write-Ahead Logging (WAL)'; Point 'Configured connection pooling (e.g. pool_size=10 in SQLAlchemy)'; Point 'Sustained 350 concurrent read requests per second benchmark'; Point 'Maintained sub-50ms p95 latency without database lock errors'.",
+          "latency_ms": 7459.21
+        },
+        {
+          "case_type": "confident_fabrication",
+          "answer": "We deployed a globally distributed Apache Cassandra cluster across 5 AWS regions with Raft multi-master consensus to handle database reads.",
+          "score": 0,
+          "evidence_quote": "We deployed a globally distributed Apache Cassandra cluster across 5 AWS regions with Raft multi-master consensus to han",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Configured SQLite journal mode to Write-Ahead Logging (WAL)'; Point 'Configured connection pooling (e.g. pool_size=10 in SQLAlchemy)'; Point 'Sustained 350 concurrent read requests per second benchmark'; Point 'Maintained sub-50ms p95 latency without database lock errors'.",
+          "latency_ms": 7430.52
+        }
+      ]
+    },
+    "item_2_dns_rfc1035": {
+      "title": "DNS RFC 1035 wire parser & struct unpack (12-byte header)",
+      "cases": [
+        {
+          "case_type": "right_numbers_wrong_subject",
+          "answer": "We unpacked 12-byte AES-GCM authentication tags in our WireGuard captive portal network access controller to resolve 45ms tokens.",
+          "score": 0,
+          "evidence_quote": "We unpacked 12-byte AES-GCM authentication tags in our WireGuard captive portal network access controller to resolve 45m",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Unpacked 12-byte DNS wire-format header using struct unpack'; Point 'Parsed query ID, flags, QDCOUNT, and ANCOUNT adhering to RFC 1035'; Point 'Decoded length-prefixed domain labels iteratively'; Point 'Handled A records and followed CNAME recursive aliases'.",
+          "latency_ms": 7769.18
+        },
+        {
+          "case_type": "correct_subject_wrong_numbers",
+          "answer": "We parsed DNS wire headers using struct unpack on a 64-byte header supporting BGP Anycast routes with 500ms resolution.",
+          "score": 0,
+          "evidence_quote": "We parsed DNS wire headers using struct unpack on a 64-byte header supporting BGP Anycast routes with 500ms resolution.",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Unpacked 12-byte DNS wire-format header using struct unpack'; Point 'Parsed query ID, flags, QDCOUNT, and ANCOUNT adhering to RFC 1035'; Point 'Decoded length-prefixed domain labels iteratively'; Point 'Handled A records and followed CNAME recursive aliases'.",
+          "latency_ms": 7563.08
+        },
+        {
+          "case_type": "contradictory_statements",
+          "answer": "Our DNS resolver does not parse binary wire packets or headers because RFC 1035 strictly forbids using Python sockets.",
+          "score": 1,
+          "evidence_quote": "RFC 1035",
+          "feedback": "Partial technical match. Verified: Point 'Parsed query ID, flags, QDCOUNT, and ANCOUNT adhering to RFC 1035' verified by \"RFC 1035\". Missed atomic points: Point 'Unpacked 12-byte DNS wire-format header using struct unpack'; Point 'Decoded length-prefixed domain labels iteratively'; Point 'Handled A records and followed CNAME recursive aliases'.",
+          "latency_ms": 7709.97
+        },
+        {
+          "case_type": "one_word_answer",
+          "answer": "DNS",
+          "score": 0,
+          "evidence_quote": "DNS",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Unpacked 12-byte DNS wire-format header using struct unpack'; Point 'Parsed query ID, flags, QDCOUNT, and ANCOUNT adhering to RFC 1035'; Point 'Decoded length-prefixed domain labels iteratively'; Point 'Handled A records and followed CNAME recursive aliases'.",
+          "latency_ms": 7660.55
+        },
+        {
+          "case_type": "confident_fabrication",
+          "answer": "We used Cloudflare Magic Transit and eBPF XDP route scrubbers to mitigate 100 Gbps DDoS amplification attacks against our nameservers.",
+          "score": 0,
+          "evidence_quote": "We used Cloudflare Magic Transit and eBPF XDP route scrubbers to mitigate 100 Gbps DDoS amplification attacks against ou",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Unpacked 12-byte DNS wire-format header using struct unpack'; Point 'Parsed query ID, flags, QDCOUNT, and ANCOUNT adhering to RFC 1035'; Point 'Decoded length-prefixed domain labels iteratively'; Point 'Handled A records and followed CNAME recursive aliases'.",
+          "latency_ms": 7603.51
+        }
+      ]
+    },
+    "item_3_neu_det_benchmark": {
+      "title": "NEU-DET 61.7% mAP50 & 70/20/10 split",
+      "cases": [
+        {
+          "case_type": "right_numbers_wrong_subject",
+          "answer": "We split our Redis cache keys across a 70/20/10 cluster ratio and reached a 61.7% cache hit rate under Locust benchmarking.",
+          "score": 0,
+          "evidence_quote": "We split our Redis cache keys across a 70/20/10 cluster ratio and reached a 61.7% cache hit rate under Locust benchmarki",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Evaluated on NEU-DET surface defect benchmark dataset'; Point 'Achieved 61.7% mAP50 detection accuracy metric'; Point 'Partitioned dataset into leak-free 70/20/10 train/val/test split'; Point 'Prevented data contamination across split partitions'.",
+          "latency_ms": 7482.67
+        },
+        {
+          "case_type": "correct_subject_wrong_numbers",
+          "answer": "We evaluated defect inspection on NEU-DET using a 90/5/5 data split, achieving 99.4% mAP50 accuracy with zero errors.",
+          "score": 1,
+          "evidence_quote": "NEU-DET",
+          "feedback": "Partial technical match. Verified: Point 'Evaluated on NEU-DET surface defect benchmark dataset' verified by \"NEU-DET\". Missed atomic points: Point 'Achieved 61.7% mAP50 detection accuracy metric'; Point 'Partitioned dataset into leak-free 70/20/10 train/val/test split'; Point 'Prevented data contamination across split partitions'.",
+          "latency_ms": 7239.52
+        },
+        {
+          "case_type": "contradictory_statements",
+          "answer": "We tested on NEU-DET but mixed all training and test images into a single set without splitting, which invalidates all 61.7% mAP metrics.",
+          "score": 2,
+          "evidence_quote": "NEU-DET; 61.7% mAP",
+          "feedback": "Partial technical match. Verified: Point 'Evaluated on NEU-DET surface defect benchmark dataset' verified by \"NEU-DET\"; Point 'Achieved 61.7% mAP50 detection accuracy metric' verified by \"61.7% mAP\". Missed atomic points: Point 'Partitioned dataset into leak-free 70/20/10 train/val/test split'; Point 'Prevented data contamination across split partitions'.",
+          "latency_ms": 7239.36
+        },
+        {
+          "case_type": "one_word_answer",
+          "answer": "NEU-DET",
+          "score": 1,
+          "evidence_quote": "NEU-DET",
+          "feedback": "Partial technical match. Verified: Point 'Evaluated on NEU-DET surface defect benchmark dataset' verified by \"NEU-DET\". Missed atomic points: Point 'Achieved 61.7% mAP50 detection accuracy metric'; Point 'Partitioned dataset into leak-free 70/20/10 train/val/test split'; Point 'Prevented data contamination across split partitions'.",
+          "latency_ms": 7562.43
+        },
+        {
+          "case_type": "confident_fabrication",
+          "answer": "We fine-tuned a 70B parameter LLaMA 3 vision model across 16 NVIDIA A100 GPUs using Fully Sharded Data Parallelism.",
+          "score": 0,
+          "evidence_quote": "We fine-tuned a 70B parameter LLaMA 3 vision model across 16 NVIDIA A100 GPUs using Fully Sharded Data Parallelism.",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Evaluated on NEU-DET surface defect benchmark dataset'; Point 'Achieved 61.7% mAP50 detection accuracy metric'; Point 'Partitioned dataset into leak-free 70/20/10 train/val/test split'; Point 'Prevented data contamination across split partitions'.",
+          "latency_ms": 7293.92
+        }
+      ]
+    },
+    "item_4_p2_ablation": {
+      "title": "4-head P2 variant ablation (62.2% vs 57.3%)",
+      "cases": [
+        {
+          "case_type": "right_numbers_wrong_subject",
+          "answer": "We configured a 4-head Kafka partition topic where consumer lag was 61.2% on validation and dropped to 57.3% on production nodes.",
+          "score": 0,
+          "evidence_quote": "We configured a 4-head Kafka partition topic where consumer lag was 61.2% on validation and dropped to 57.3% on producti",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Introduced 4-head P2 architectural modification for small defects'; Point 'Observed validation gain (62.2% vs 61.2% baseline)'; Point 'Observed test set generalization drop to 57.3%'; Point 'Retained baseline architecture based on test performance'.",
+          "latency_ms": 7247.97
+        },
+        {
+          "case_type": "correct_subject_wrong_numbers",
+          "answer": "Our 4-head P2 variant achieved 94.5% validation accuracy compared to 80% baseline, and maintained 92% on the test set so we deployed it.",
+          "score": 1,
+          "evidence_quote": "4-head P2 variant",
+          "feedback": "Partial technical match. Verified: Point 'Introduced 4-head P2 architectural modification for small defects' verified by \"4-head P2 variant\". Missed atomic points: Point 'Observed validation gain (62.2% vs 61.2% baseline)'; Point 'Observed test set generalization drop to 57.3%'; Point 'Retained baseline architecture based on test performance'.",
+          "latency_ms": 7050.44
+        },
+        {
+          "case_type": "contradictory_statements",
+          "answer": "We tested a 4-head P2 variant which showed no changes whatsoever on validation or test sets because ablation studies cannot measure neural heads.",
+          "score": 1,
+          "evidence_quote": "4-head P2 variant",
+          "feedback": "Partial technical match. Verified: Point 'Introduced 4-head P2 architectural modification for small defects' verified by \"4-head P2 variant\". Missed atomic points: Point 'Observed validation gain (62.2% vs 61.2% baseline)'; Point 'Observed test set generalization drop to 57.3%'; Point 'Retained baseline architecture based on test performance'.",
+          "latency_ms": 7104.97
+        },
+        {
+          "case_type": "one_word_answer",
+          "answer": "Ablation",
+          "score": 0,
+          "evidence_quote": "Ablation",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Introduced 4-head P2 architectural modification for small defects'; Point 'Observed validation gain (62.2% vs 61.2% baseline)'; Point 'Observed test set generalization drop to 57.3%'; Point 'Retained baseline architecture based on test performance'.",
+          "latency_ms": 7225.54
+        },
+        {
+          "case_type": "confident_fabrication",
+          "answer": "We trained deep reinforcement learning agents with proximal policy optimization to automatically prune attention heads in real-time.",
+          "score": 0,
+          "evidence_quote": "We trained deep reinforcement learning agents with proximal policy optimization to automatically prune attention heads i",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Introduced 4-head P2 architectural modification for small defects'; Point 'Observed validation gain (62.2% vs 61.2% baseline)'; Point 'Observed test set generalization drop to 57.3%'; Point 'Retained baseline architecture based on test performance'.",
+          "latency_ms": 7219.91
+        }
+      ]
+    },
+    "item_5_onnx_latency": {
+      "title": "ONNX export & AWS EC2 T4 1.6ms latency",
+      "cases": [
+        {
+          "case_type": "right_numbers_wrong_subject",
+          "answer": "Our SQLite database logged 1.6ms p99 write latency on an AWS EC2 instance running 416 concurrent threads.",
+          "score": 1,
+          "evidence_quote": "1.6ms",
+          "feedback": "Partial technical match. Verified: Point 'Profiled 1.6ms execution latency per frame' verified by \"1.6ms\". Missed atomic points: Point 'Exported baseline model to ONNX runtime format'; Point 'Benchmarked on AWS EC2 Tesla T4 GPU instance'; Point 'Evaluated at 416x416 frame resolution'.",
+          "latency_ms": 7327.18
+        },
+        {
+          "case_type": "correct_subject_wrong_numbers",
+          "answer": "We exported to ONNX format and profiled GPU inference on an AWS T4 instance, measuring 45ms latency per frame at 1080p resolution.",
+          "score": 1,
+          "evidence_quote": "ONNX format",
+          "feedback": "Partial technical match. Verified: Point 'Exported baseline model to ONNX runtime format' verified by \"ONNX format\". Missed atomic points: Point 'Benchmarked on AWS EC2 Tesla T4 GPU instance'; Point 'Profiled 1.6ms execution latency per frame'; Point 'Evaluated at 416x416 frame resolution'.",
+          "latency_ms": 7148.46
+        },
+        {
+          "case_type": "contradictory_statements",
+          "answer": "We exported to ONNX but inference latency cannot be benchmarked on GPUs because ONNX Runtime strictly disables GPU acceleration.",
+          "score": 1,
+          "evidence_quote": "ONNX",
+          "feedback": "Partial technical match. Verified: Point 'Exported baseline model to ONNX runtime format' verified by \"ONNX\". Missed atomic points: Point 'Benchmarked on AWS EC2 Tesla T4 GPU instance'; Point 'Profiled 1.6ms execution latency per frame'; Point 'Evaluated at 416x416 frame resolution'.",
+          "latency_ms": 7074.24
+        },
+        {
+          "case_type": "one_word_answer",
+          "answer": "ONNX",
+          "score": 1,
+          "evidence_quote": "ONNX",
+          "feedback": "Partial technical match. Verified: Point 'Exported baseline model to ONNX runtime format' verified by \"ONNX\". Missed atomic points: Point 'Benchmarked on AWS EC2 Tesla T4 GPU instance'; Point 'Profiled 1.6ms execution latency per frame'; Point 'Evaluated at 416x416 frame resolution'.",
+          "latency_ms": 7301.85
+        },
+        {
+          "case_type": "confident_fabrication",
+          "answer": "We compiled custom CUDA C++ kernels using TensorRT LLM with FP8 quantization running across 8 NVIDIA H100 SXM5 GPUs.",
+          "score": 0,
+          "evidence_quote": "We compiled custom CUDA C++ kernels using TensorRT LLM with FP8 quantization running across 8 NVIDIA H100 SXM5 GPUs.",
+          "feedback": "No verified atomic rubric points satisfied in candidate answer. Missed: Point 'Exported baseline model to ONNX runtime format'; Point 'Benchmarked on AWS EC2 Tesla T4 GPU instance'; Point 'Profiled 1.6ms execution latency per frame'; Point 'Evaluated at 416x416 frame resolution'.",
+          "latency_ms": 7015.34
+        }
+      ]
+    }
+  }
+}

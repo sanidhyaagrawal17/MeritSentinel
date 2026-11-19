@@ -188,6 +188,7 @@ def interview_cmd(persona: str | None, data_dir: str | None, user: str, budget: 
         else:
             rubrics = build_rubrics_for_persona(effective_persona)
 
+        rubric_store.clear_rubrics_for_persona(effective_persona)
         rubric_store.save_rubrics(rubrics)
         click.echo(f"==> Registered {len(rubrics)} grounded rubric items in SQLite.")
 

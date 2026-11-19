@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}ResumeProof | Truth-First Technical Interview Engine{% endblock %}</title>
+  <title>{% block title %}MeritSentinel | Truth-First Technical Interview Engine{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js"></script>
@@ -11,11 +11,16 @@
 <body>
   <header>
     <a href="/" class="brand">
-      <span>ResumeProof</span>
+      <span>MeritSentinel</span>
       <span class="brand-badge">Audit AI</span>
     </a>
     <nav>
       <a href="/" class="{% if nav_active == 'home' %}active{% endif %}">Upload & Demo</a>
+      {% if active_session %}
+      <a href="/interview/{{ active_session.id }}" class="{% if nav_active == 'interview' %}active{% endif %}" style="color: #60a5fa; font-weight: 600;">
+        Active Interview (Turn {{ active_session.turns|length + 1 }}/{{ active_session.budget }})
+      </a>
+      {% endif %}
       {% if user_id %}
       <a href="/review/{{ user_id }}" class="{% if nav_active == 'review' %}active{% endif %}">Claim Review</a>
       <a href="/dashboard/{{ user_id }}" class="{% if nav_active == 'dashboard' %}active{% endif %}">Mastery Dashboard</a>
@@ -23,6 +28,38 @@
       {% endif %}
     </nav>
   </header>
+
+  {% if user_id %}
+  <div class="pipeline-stepper-bar">
+    <div class="pipeline-stepper-inner">
+      <a href="/" class="step-item {% if nav_active == 'home' %}active{% else %}done{% endif %}">
+        <span class="step-num">1</span> Upload
+      </a>
+      <span class="step-arrow">&rarr;</span>
+      <a href="/review/{{ user_id }}" class="step-item {% if nav_active == 'review' %}active{% elif nav_active in ['interview', 'dashboard', 'tailor'] %}done{% endif %}">
+        <span class="step-num">2</span> Review Claims
+      </a>
+      <span class="step-arrow">&rarr;</span>
+      {% if active_session %}
+      <a href="/interview/{{ active_session.id }}" class="step-item {% if nav_active == 'interview' %}active{% elif nav_active in ['dashboard', 'tailor'] %}done{% endif %}">
+        <span class="step-num">3</span> AI Interview
+      </a>
+      {% else %}
+      <span class="step-item {% if nav_active == 'interview' %}active{% endif %}">
+        <span class="step-num">3</span> AI Interview
+      </span>
+      {% endif %}
+      <span class="step-arrow">&rarr;</span>
+      <a href="/dashboard/{{ user_id }}" class="step-item {% if nav_active == 'dashboard' %}active{% elif nav_active == 'tailor' %}done{% endif %}">
+        <span class="step-num">4</span> Mastery
+      </a>
+      <span class="step-arrow">&rarr;</span>
+      <a href="/tailor/{{ user_id }}" class="step-item {% if nav_active == 'tailor' %}active{% endif %}">
+        <span class="step-num">5</span> Tailor &amp; Export
+      </a>
+    </div>
+  </div>
+  {% endif %}
 
   <main class="container">
     {% block content %}{% endblock %}

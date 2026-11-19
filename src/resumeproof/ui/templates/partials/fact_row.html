@@ -1,0 +1,33 @@
+<div class="fact-inline-chip {% if f.is_confirmed %}confirmed{% else %}pending{% endif %}" id="fact-{{ f.id }}">
+  <div class="fact-chip-content">
+    <span class="fact-chip-label">{{ f.fact_type.value.replace('_', ' ') }}</span>
+    <span class="fact-chip-value" title="{{ f.value }}">{{ f.value }}</span>
+  </div>
+  <div class="fact-chip-actions">
+    {% if f.is_confirmed %}
+    <span class="chip-status-tag confirmed">Confirmed</span>
+    <button
+      type="button"
+      class="btn-fact-undo"
+      hx-post="/review/{{ user_id }}/reject_fact"
+      hx-vals='{"fact_id": "{{ f.id }}"}'
+      hx-target="#fact-{{ f.id }}"
+      hx-swap="outerHTML show:none"
+      title="Reset fact to Pending">
+      ↺ Undo
+    </button>
+    {% else %}
+    <span class="chip-status-tag pending">Pending</span>
+    <button
+      type="button"
+      class="btn-fact-confirm"
+      hx-post="/review/{{ user_id }}/confirm_fact"
+      hx-vals='{"fact_id": "{{ f.id }}"}'
+      hx-target="#fact-{{ f.id }}"
+      hx-swap="outerHTML show:none"
+      title="Confirm fact">
+      ✓ Confirm
+    </button>
+    {% endif %}
+  </div>
+</div>

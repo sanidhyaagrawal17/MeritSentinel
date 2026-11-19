@@ -7,6 +7,7 @@ import tempfile
 from typing import Optional
 import uuid
 import re
+import urllib.parse
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse
@@ -16,9 +17,13 @@ from fastapi.templating import Jinja2Templates
 from resumeproof.core.config import settings
 from resumeproof.core.db import Database
 from resumeproof.core.llm import OpenAICompatibleClient, FakeLLMClient, LLMClient
-from resumeproof.extractor.pdf_parser import parse_resume
-from resumeproof.extractor.claim_extractor import extract_from_resume
-from resumeproof.schemas.claims import Claim, ClaimStatus
+from resumeproof.extractor.pdf_parser import (
+    parse_resume,
+    ResumePageLimitExceededError,
+    ResumeLengthExceededError,
+)
+from resumeproof.extractor.claim_extractor import extract_from_resume, infer_skill_category
+from resumeproof.schemas.claims import Claim, ClaimStatus, ClaimType
 from resumeproof.schemas.facts import ProfileFact
 from resumeproof.schemas.interview import (
     InterviewQuestion,
@@ -33,7 +38,14 @@ from resumeproof.interview.grader import AnswerGrader
 from resumeproof.interview.caching import GradingCache
 from resumeproof.interview.background import BackgroundGrader
 from resumeproof.interview.session_store import SessionStore
+from resumeproof.interview.session_logger import SessionLogger
 from resumeproof.interview.engine import InterviewEngine
+from resumeproof.core.security import (
+    create_signed_session_token,
+    verify_signed_session_token,
+    screen_candidate_answer,
+    global_rate_limiter,
+)
 from resumeproof.tailoring.engine import TailoringEngine, GapReport, TailoringResult
 from resumeproof.verifier.strict_verifier import (
     StrictVerifier,
@@ -46,7 +58,7 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="ResumeProof", version="0.1.0")
+app = FastAPI(title="MeritSentinel", version="0.1.0")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.autoescape = True
@@ -77,6 +89,7 @@ def init_app_services(
     claim_store = ClaimStore(db)
     rubric_store = RubricStore(db)
     session_store = SessionStore(db, claim_store)
+    session_logger = SessionLogger(db)
 
     if llm:
         llm_client = llm
@@ -95,6 +108,7 @@ def init_app_services(
         session_store=session_store,
         generator=generator,
         background_grader=background_grader,
+        session_logger=session_logger,
     )
 
     return {
@@ -102,6 +116,7 @@ def init_app_services(
         "claim_store": claim_store,
         "rubric_store": rubric_store,
         "session_store": session_store,
+        "session_logger": session_logger,
         "llm_client": llm_client,
         "generator": generator,
         "grader": grader,
@@ -115,26 +130,107 @@ app.state.services = init_app_services()
 
 
 # ---------------------------------------------------------------------------
+# Security Headers & Throttling Middleware
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """Enforces rate limiting on POST routes and attaches robust security headers."""
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Enforce CORS Origin check on POST requests
+    if request.method == "POST":
+        origin = request.headers.get("origin")
+        if origin:
+            parsed_origin = urllib.parse.urlparse(origin)
+            host = request.headers.get("host")
+            if host and parsed_origin.netloc != host:
+                return Response("Forbidden: cross-origin request rejected.", status_code=403)
+
+    if request.method == "POST" and client_ip != "testclient":
+        if not global_rate_limiter.is_allowed(client_ip):
+            return Response("Too Many Requests. Submission rate limit exceeded.", status_code=429)
+
+    response = await call_next(request)
+
+    # Security Headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self';"
+    )
+    return response
+
+
+def get_current_user_and_session(request: Request) -> tuple[Optional[str], Optional[InterviewSession]]:
+    """Extracts verified user_id from signed cookie and retrieves any active interview session."""
+    cookie = request.cookies.get("meritsentinel_session")
+    user_id = None
+    if cookie:
+        payload = verify_signed_session_token(cookie)
+        if payload and "user_id" in payload:
+            user_id = payload["user_id"]
+
+    active_session = None
+    services = getattr(request.app.state, "services", None)
+    if user_id and services and "session_store" in services:
+        active_session = services["session_store"].get_active_session_for_user(user_id)
+
+    return user_id, active_session
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Home page with demo persona selector and file upload form."""
+    """Home page with demo persona selector, resume upload form, and active session resumption."""
+    curr_user, active_session = get_current_user_and_session(request)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"nav_active": "home", "user_id": None},
+        context={
+            "nav_active": "home",
+            "user_id": curr_user,
+            "active_session": active_session,
+        },
     )
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     """Serves application favicon."""
-    fav_path = Path("src/resumeproof/ui/static/favicon.svg")
+    fav_path = STATIC_DIR / "favicon.svg"
     if fav_path.exists():
         return FileResponse(fav_path, media_type="image/svg+xml")
     return Response(status_code=204)
+
+
+def _upload_error_response(request: Request, status_code: int, detail: str):
+    """Returns a styled HTML error on browser form submits, or raises HTTPException for API clients."""
+    accept = request.headers.get("accept", "").lower()
+    if "text/html" in accept:
+        services = app.state.services
+        session_store: SessionStore = services["session_store"]
+        _, active_session = get_current_user_and_session(request)
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "nav_active": "home",
+                "active_session": active_session,
+                "error_message": detail,
+            },
+            status_code=status_code,
+        )
+    raise HTTPException(status_code=status_code, detail=detail)
 
 
 @app.post("/upload")
@@ -165,9 +261,10 @@ async def upload_resume(
     elif file and file.filename:
         ext = Path(file.filename.replace("\\", "/")).suffix.lower()
         if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type '{ext}'. Only .pdf, .md, and .txt files are allowed."
+            return _upload_error_response(
+                request,
+                400,
+                f"Unsupported file type '{ext}'. Only .pdf, .md, and .txt files are allowed.",
             )
 
         safe_filename = sanitize_filename(file.filename)
@@ -183,23 +280,38 @@ async def upload_resume(
                 if total_bytes > settings.max_upload_size_bytes:
                     f_out.close()
                     resume_path.unlink(missing_ok=True)
-                    raise HTTPException(
-                        status_code=413,
-                        detail="File size exceeds maximum allowed limit of 5MB."
+                    return _upload_error_response(
+                        request,
+                        413,
+                        "File size exceeds maximum allowed limit of 5MB.",
                     )
                 f_out.write(chunk)
     else:
         # Default fallback to sam_okafor
         resume_path = Path("data/demo/sam_okafor/resume.pdf")
 
-    # Parse and extract
-    parse_result = parse_resume(resume_path)
+    # Parse and extract with strict resume boundaries (max pages and lines)
+    try:
+        parse_result = parse_resume(
+            resume_path,
+            max_pages=settings.max_resume_pages,
+            max_lines=settings.max_resume_lines,
+        )
+    except (ResumePageLimitExceededError, ResumeLengthExceededError, ValueError) as err:
+        if file and file.filename and resume_path and resume_path.exists():
+            resume_path.unlink(missing_ok=True)
+        return _upload_error_response(request, 400, str(err))
     facts, claims = extract_from_resume(
         parse_result=parse_result,
         llm_client=llm_client,
         user_id=user_id,
         persona_id=effective_persona,
     )
+
+    if persona:
+        existing_claims = claim_store.get_claims(user_id=user_id)
+        if existing_claims and any(c.persona_id and c.persona_id != effective_persona for c in existing_claims):
+            claim_store.clear_claims(user_id)
 
     claim_store.clear_user_data(user_id)
     # Persist in DB
@@ -208,10 +320,15 @@ async def upload_resume(
     for c in claims:
         claim_store.save_claim(c)
 
-    # Build and persist rubrics if persona exists
+    # Build and persist rubrics (demo persona or dynamically synthesized for custom resume)
     try:
+        from resumeproof.rubric.builder import synthesize_rubrics_from_claims
+        rubric_store.clear_rubrics_for_persona(effective_persona)
         rubrics = build_rubrics_for_persona(effective_persona)
-        rubric_store.save_rubrics(rubrics)
+        if not rubrics:
+            rubrics = synthesize_rubrics_from_claims(claims, effective_persona)
+        if rubrics:
+            rubric_store.save_rubrics(rubrics)
     except Exception:
         pass
 
@@ -221,10 +338,30 @@ async def upload_resume(
         except Exception:
             pass
 
-    return RedirectResponse(
+    response = RedirectResponse(
         url=f"/review/{user_id}?persona={effective_persona}",
         status_code=303,
     )
+    # Set persistent cryptographically signed session cookie
+    token = create_signed_session_token(user_id=user_id, extra_data={"persona": effective_persona})
+    session_store: SessionStore = services["session_store"]
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    session_store.save_user_session(
+        session_token=token,
+        user_id=user_id,
+        client_ip=client_ip,
+        user_agent=user_agent,
+    )
+    response.set_cookie(
+        key="meritsentinel_session",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        path="/",
+        max_age=604800,
+    )
+    return response
 
 
 @app.get("/review/{user_id}", response_class=HTMLResponse)
@@ -232,10 +369,43 @@ async def review_claims(request: Request, user_id: str, persona: Optional[str] =
     """Review screen to confirm or reject parsed candidate claims."""
     services = app.state.services
     claim_store: ClaimStore = services["claim_store"]
+    session_store: SessionStore = services["session_store"]
 
     claims = claim_store.get_claims(user_id=user_id)
     facts = claim_store.get_profile_facts(user_id=user_id)
     persona_id = persona or (claims[0].persona_id if claims else "default_persona")
+    active_session = session_store.get_active_session_for_user(user_id)
+
+    # Separate skills from substantive audit claims
+    skill_claims = [c for c in claims if c.claim_type == ClaimType.SKILL]
+    audit_claims = [c for c in claims if c.claim_type != ClaimType.SKILL]
+
+    # Group skills by category
+    skills_by_category: dict[str, list[Claim]] = {}
+    for sc in skill_claims:
+        cat = sc.project_id or infer_skill_category(sc.raw_sentence or "", sc.text)
+        if cat not in skills_by_category:
+            skills_by_category[cat] = []
+        skills_by_category[cat].append(sc)
+
+    # Group substantive claims into sections with drop tables
+    project_claims: dict[str, list[Claim]] = {}
+    experience_claims: list[Claim] = []
+    achievement_claims: list[Claim] = []
+    other_claims: list[Claim] = []
+
+    for c in audit_claims:
+        if c.claim_type == ClaimType.EXPERIENCE_CLAIM:
+            experience_claims.append(c)
+        elif c.claim_type == ClaimType.ACHIEVEMENT:
+            achievement_claims.append(c)
+        elif c.project_id:
+            project_claims.setdefault(c.project_id, []).append(c)
+        else:
+            other_claims.append(c)
+
+    facts_by_type = {f.fact_type.value: f for f in facts}
+    total_project_claims_count = sum(len(plist) for plist in project_claims.values())
 
     return templates.TemplateResponse(
         request=request,
@@ -244,9 +414,104 @@ async def review_claims(request: Request, user_id: str, persona: Optional[str] =
             "nav_active": "review",
             "user_id": user_id,
             "persona_id": persona_id,
-            "claims": claims,
+            "claims": audit_claims,
+            "all_claims": claims,
+            "skill_claims": skill_claims,
+            "skills_by_category": skills_by_category,
+            "project_claims": project_claims,
+            "total_project_claims_count": total_project_claims_count,
+            "experience_claims": experience_claims,
+            "achievement_claims": achievement_claims,
+            "other_claims": other_claims,
             "facts": facts,
+            "facts_by_type": facts_by_type,
+            "active_session": active_session,
         },
+    )
+
+
+@app.post("/review/{user_id}/toggle_skill", response_class=HTMLResponse)
+async def toggle_skill(request: Request, user_id: str, claim_id: str = Form(...)):
+    """Toggles skill confirmation state cycling: Pending -> Confirmed -> Rejected -> Pending."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim = claim_store.get_claim(claim_id)
+    if not claim:
+        return HTMLResponse("")
+
+    if claim.status == ClaimStatus.EXTRACTED:
+        new_status = ClaimStatus.CONFIRMED
+    elif claim.status == ClaimStatus.CONFIRMED:
+        new_status = ClaimStatus.REJECTED
+    else:
+        new_status = ClaimStatus.EXTRACTED
+
+    claim_store.update_claim_review(claim_id=claim_id, action=new_status)
+    claim.status = new_status
+
+    html = templates.get_template("partials/skill_badge.html").render(
+        s=claim,
+        user_id=user_id,
+    )
+    return HTMLResponse(html)
+
+
+@app.post("/review/{user_id}/confirm_skill_category")
+async def confirm_skill_category(request: Request, user_id: str, category: str = Form(...)):
+    """Bulk confirms all skills within a specific category."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claims = claim_store.get_claims(user_id=user_id)
+    for c in claims:
+        cat = c.project_id or infer_skill_category(c.raw_sentence or "", c.text)
+        if c.claim_type == ClaimType.SKILL and cat == category:
+            claim_store.update_claim_review(claim_id=c.id, action=ClaimStatus.CONFIRMED)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
+
+
+@app.post("/review/{user_id}/reset_skill_category")
+async def reset_skill_category(request: Request, user_id: str, category: str = Form(...)):
+    """Resets all skills in a specific category back to pending (Undo Group)."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claims = claim_store.get_claims(user_id=user_id)
+    for c in claims:
+        cat = c.project_id or infer_skill_category(c.raw_sentence or "", c.text)
+        if c.claim_type == ClaimType.SKILL and cat == category:
+            claim_store.update_claim_review(claim_id=c.id, action=ClaimStatus.EXTRACTED)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
+
+
+@app.post("/review/{user_id}/confirm_project")
+async def confirm_project(request: Request, user_id: str, project_id: str = Form(...)):
+    """Bulk confirms all claims for a specific project."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claims = claim_store.get_claims(user_id=user_id)
+    for c in claims:
+        if c.project_id == project_id and c.claim_type != ClaimType.SKILL:
+            claim_store.update_claim_review(claim_id=c.id, action=ClaimStatus.CONFIRMED)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
+
+
+@app.post("/review/{user_id}/reset_project")
+async def reset_project(request: Request, user_id: str, project_id: str = Form(...)):
+    """Resets all claims for a specific project back to pending (Undo Project)."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claims = claim_store.get_claims(user_id=user_id)
+    for c in claims:
+        if c.project_id == project_id and c.claim_type != ClaimType.SKILL:
+            claim_store.update_claim_review(claim_id=c.id, action=ClaimStatus.EXTRACTED)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
+
+
+def _render_claim_row(c: Claim, user_id: str, persona: Optional[str] = None) -> str:
+    """Renders a single resume bullet row via autoescaped Jinja2 partial."""
+    return templates.get_template("partials/claim_row.html").render(
+        c=c,
+        user_id=user_id,
+        persona_id=persona or "",
     )
 
 
@@ -262,43 +527,7 @@ async def confirm_claim(
     claim_store: ClaimStore = services["claim_store"]
     claim_store.update_claim_review(claim_id=claim_id, action=ClaimStatus.CONFIRMED)
     c = claim_store.get_claim(claim_id)
-
-    # Return partial row for HTMX swap
-    return HTMLResponse(
-        f"""
-        <tr id="claim-{c.id}" data-id="{c.id}" data-type="{c.claim_type.value}" data-project="{c.project_id or ''}" data-status="{c.status.value}">
-          <td>
-            <span class="badge badge-neutral">{c.claim_type.value}</span>
-            {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{c.project_id}</code></div>' if c.project_id else ''}
-          </td>
-          <td>
-            <div style="color: #fff; font-weight: 500;">{c.text}</div>
-            {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Source line: {c.source_line}</div>' if c.source_line else ''}
-          </td>
-          <td>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
-              {''.join(f'<code>{t}</code>' for t in c.tools)}
-              {''.join(f'<span class="badge badge-warning" style="font-size: 0.7rem;">{m}</span>' for m in c.metric_values)}
-            </div>
-          </td>
-          <td>
-            <span class="badge badge-success">Confirmed</span>
-          </td>
-          <td style="text-align: right;">
-            <div style="display: inline-flex; gap: 0.4rem;">
-              <button 
-                class="btn btn-secondary btn-sm"
-                hx-post="/review/{user_id}/reject_claim"
-                hx-vals='{{"claim_id": "{c.id}", "persona": "{persona or ""}"}}'
-                hx-target="#claim-{c.id}"
-                hx-swap="outerHTML">
-                Reject
-              </button>
-            </div>
-          </td>
-        </tr>
-        """
-    )
+    return HTMLResponse(_render_claim_row(c, user_id, persona))
 
 
 @app.post("/review/{user_id}/reject_claim", response_class=HTMLResponse)
@@ -313,42 +542,72 @@ async def reject_claim(
     claim_store: ClaimStore = services["claim_store"]
     claim_store.update_claim_review(claim_id=claim_id, action=ClaimStatus.REJECTED)
     c = claim_store.get_claim(claim_id)
+    return HTMLResponse(_render_claim_row(c, user_id, persona))
 
-    return HTMLResponse(
-        f"""
-        <tr id="claim-{c.id}" data-id="{c.id}" data-type="{c.claim_type.value}" data-project="{c.project_id or ''}" data-status="{c.status.value}">
-          <td>
-            <span class="badge badge-neutral">{c.claim_type.value}</span>
-            {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;"><code>{c.project_id}</code></div>' if c.project_id else ''}
-          </td>
-          <td>
-            <div style="color: #fff; font-weight: 500;">{c.text}</div>
-            {f'<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Source line: {c.source_line}</div>' if c.source_line else ''}
-          </td>
-          <td>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
-              {''.join(f'<code>{t}</code>' for t in c.tools)}
-              {''.join(f'<span class="badge badge-warning" style="font-size: 0.7rem;">{m}</span>' for m in c.metric_values)}
-            </div>
-          </td>
-          <td>
-            <span class="badge badge-danger">Rejected</span>
-          </td>
-          <td style="text-align: right;">
-            <div style="display: inline-flex; gap: 0.4rem;">
-              <button 
-                class="btn btn-success btn-sm"
-                hx-post="/review/{user_id}/confirm_claim"
-                hx-vals='{{"claim_id": "{c.id}", "persona": "{persona or ""}"}}'
-                hx-target="#claim-{c.id}"
-                hx-swap="outerHTML">
-                Confirm
-              </button>
-            </div>
-          </td>
-        </tr>
-        """
+
+@app.post("/review/{user_id}/reset_claim", response_class=HTMLResponse)
+async def reset_claim(
+    request: Request,
+    user_id: str,
+    claim_id: str = Form(...),
+    persona: Optional[str] = Form(None),
+):
+    """Resets a technical claim back to pending (extracted) status (Undo)."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.update_claim_review(claim_id=claim_id, action=ClaimStatus.EXTRACTED)
+    c = claim_store.get_claim(claim_id)
+    return HTMLResponse(_render_claim_row(c, user_id, persona))
+
+
+def _render_fact_row(f: ProfileFact, user_id: str) -> str:
+    """Renders a single profile fact chip via autoescaped Jinja2 partial."""
+    return templates.get_template("partials/fact_row.html").render(
+        f=f,
+        user_id=user_id,
     )
+
+
+@app.get("/review/{user_id}/claim_edit_form", response_class=HTMLResponse)
+async def claim_edit_form(request: Request, user_id: str, claim_id: str, persona: Optional[str] = None):
+    """Renders inline edit box for a claim bullet."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    c = claim_store.get_claim(claim_id)
+    if not c:
+        return HTMLResponse("")
+    html = templates.get_template("partials/claim_edit_form.html").render(
+        c=c,
+        user_id=user_id,
+        persona_id=persona or "",
+    )
+    return HTMLResponse(html)
+
+
+@app.post("/review/{user_id}/save_claim_edit", response_class=HTMLResponse)
+async def save_claim_edit(request: Request, user_id: str, claim_id: str = Form(...), edited_text: str = Form(...), persona: Optional[str] = Form(None)):
+    """Saves user edit to a technical claim and returns updated resume bullet."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    c = claim_store.get_claim(claim_id)
+    if not c:
+        return HTMLResponse("")
+    clean_text = edited_text.strip()
+    if clean_text:
+        claim_store.update_claim_review(claim_id=claim_id, action=c.status, user_correction_text=clean_text)
+        c = claim_store.get_claim(claim_id)
+    return HTMLResponse(_render_claim_row(c, user_id, persona))
+
+
+@app.get("/review/{user_id}/cancel_claim_edit", response_class=HTMLResponse)
+async def cancel_claim_edit(request: Request, user_id: str, claim_id: str, persona: Optional[str] = None):
+    """Cancels inline editing and restores standard resume bullet row."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    c = claim_store.get_claim(claim_id)
+    if not c:
+        return HTMLResponse("")
+    return HTMLResponse(_render_claim_row(c, user_id, persona))
 
 
 @app.post("/review/{user_id}/confirm_fact", response_class=HTMLResponse)
@@ -364,27 +623,7 @@ async def confirm_fact(
     f = claim_store.get_profile_fact(fact_id)
     if not f:
         return HTMLResponse("")
-    return HTMLResponse(
-        f"""
-        <div class="fact-card" id="fact-{f.id}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
-          <div>
-            <div class="fact-card-label">{f.fact_type.value.replace('_', ' ')}</div>
-            <div class="fact-card-value">{f.value}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="badge badge-success" style="font-size: 0.7rem;">Confirmed</span>
-            <button 
-              class="btn btn-secondary btn-sm"
-              hx-post="/review/{user_id}/reject_fact"
-              hx-vals='{{"fact_id": "{f.id}"}}'
-              hx-target="#fact-{f.id}"
-              hx-swap="outerHTML">
-              Undo
-            </button>
-          </div>
-        </div>
-        """
-    )
+    return HTMLResponse(_render_fact_row(f, user_id))
 
 
 @app.post("/review/{user_id}/reject_fact", response_class=HTMLResponse)
@@ -393,34 +632,32 @@ async def reject_fact(
     user_id: str,
     fact_id: str = Form(...),
 ):
-    """Unconfirms/rejects an individual profile fact."""
+    """Unconfirms/resets an individual profile fact to pending (Undo)."""
     services = app.state.services
     claim_store: ClaimStore = services["claim_store"]
     claim_store.reject_profile_fact(fact_id=fact_id)
     f = claim_store.get_profile_fact(fact_id)
     if not f:
         return HTMLResponse("")
-    return HTMLResponse(
-        f"""
-        <div class="fact-card" id="fact-{f.id}" style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
-          <div>
-            <div class="fact-card-label">{f.fact_type.value.replace('_', ' ')}</div>
-            <div class="fact-card-value">{f.value}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="badge badge-neutral" style="font-size: 0.7rem;">Pending</span>
-            <button 
-              class="btn btn-success btn-sm"
-              hx-post="/review/{user_id}/confirm_fact"
-              hx-vals='{{"fact_id": "{f.id}"}}'
-              hx-target="#fact-{f.id}"
-              hx-swap="outerHTML">
-              Confirm
-            </button>
-          </div>
-        </div>
-        """
-    )
+    return HTMLResponse(_render_fact_row(f, user_id))
+
+
+@app.post("/review/{user_id}/confirm_all_facts")
+async def confirm_all_facts(request: Request, user_id: str):
+    """Bulk confirms all profile facts for the user."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.confirm_all_facts(user_id=user_id)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
+
+
+@app.post("/review/{user_id}/reset_all_facts")
+async def reset_all_facts(request: Request, user_id: str):
+    """Resets all profile facts back to pending (Undo All Facts)."""
+    services = app.state.services
+    claim_store: ClaimStore = services["claim_store"]
+    claim_store.reset_all_facts(user_id=user_id)
+    return RedirectResponse(url=f"/review/{user_id}", status_code=303)
 
 
 @app.post("/review/{user_id}/confirm_all")
@@ -472,17 +709,56 @@ async def start_interview(
     """Creates a new interview session and redirects to the interview room."""
     services = app.state.services
     engine: InterviewEngine = services["engine"]
+    session_store: SessionStore = services["session_store"]
     effective_persona = persona or "sam_okafor"
+
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
 
     session = engine.start_session(
         persona_id=effective_persona,
         user_id=user_id,
         budget=budget,
+        client_ip=client_ip,
+        user_agent=user_agent,
     )
-    return RedirectResponse(
+
+    response = RedirectResponse(
         url=f"/interview/{session.id}",
         status_code=303,
     )
+
+    # Persist or update session token
+    cookie_token = request.cookies.get("meritsentinel_session")
+    token_valid = False
+    if cookie_token:
+        try:
+            payload = verify_signed_session_token(cookie_token)
+            if payload.get("user_id") == user_id:
+                token_valid = True
+                session_store.touch_user_session(cookie_token, active_interview_id=session.id)
+        except Exception:
+            token_valid = False
+
+    if not token_valid:
+        token = create_signed_session_token(user_id=user_id, extra_data={"persona": effective_persona})
+        session_store.save_user_session(
+            session_token=token,
+            user_id=user_id,
+            active_interview_id=session.id,
+            client_ip=client_ip,
+            user_agent=user_agent,
+        )
+        response.set_cookie(
+            key="meritsentinel_session",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            path="/",
+            max_age=604800,
+        )
+
+    return response
 
 
 @app.get("/interview/{session_id}", response_class=HTMLResponse)
@@ -508,6 +784,13 @@ async def interview_room(request: Request, session_id: str):
         if current_question:
             claim_obj = claim_store.get_claim(current_question.claim_id)
             target_claim_text = claim_obj.text if claim_obj else "Technical Claim"
+    else:
+        # Finalize if not already finalized
+        if session.status == "active":
+            engine.finalize_session(session_id)
+            session = session_store.get_session(session_id) or session
+            turns = session_store.get_turns_for_session(session_id)
+            has_pending_grades = any(t.grade is None for t in turns)
 
     return templates.TemplateResponse(
         request=request,
@@ -520,6 +803,7 @@ async def interview_room(request: Request, session_id: str):
             "target_claim_text": target_claim_text,
             "has_pending_grades": has_pending_grades,
             "user_id": session.user_id,
+            "active_session": session if session.status == "active" else None,
         },
     )
 
@@ -537,19 +821,37 @@ async def submit_answer(
     project_id: Optional[str] = Form(None),
     answer_text: str = Form(...),
 ):
-    """Submits answer with async background grading and instantly advances the session."""
+    """Submits answer with async background grading, security screening, and advances the session."""
     services = app.state.services
     engine: InterviewEngine = services["engine"]
+    session_store: SessionStore = services["session_store"]
 
-    question = InterviewQuestion(
-        id=question_id,
-        claim_id=claim_id,
-        priority=QuestionPriority(priority),
-        question_text=question_text,
-        is_followup=(is_followup == "1"),
-        rubric_id=rubric_id if rubric_id else None,
-        project_id=project_id if project_id else None,
-    )
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Interview session {session_id} not found")
+    if session.status != "active" or len(session.turns) >= session.budget:
+        return RedirectResponse(url=f"/interview/{session_id}", status_code=303)
+
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    # Security screen candidate answer for adversarial injection / obfuscation
+    adv_scan = screen_candidate_answer(answer_text)
+    is_adversarial = adv_scan["is_adversarial"]
+    adversarial_reasons = adv_scan["reasons"]
+
+    if session.current_question is not None:
+        question = session.current_question
+    else:
+        question = InterviewQuestion(
+            id=question_id,
+            claim_id=claim_id,
+            priority=QuestionPriority(priority),
+            question_text=question_text,
+            is_followup=(is_followup == "1"),
+            rubric_id=rubric_id if rubric_id else None,
+            project_id=project_id if project_id else None,
+        )
 
     # Notice: wait_for_grade=False submits to background worker and returns immediately!
     engine.submit_answer(
@@ -557,6 +859,10 @@ async def submit_answer(
         question=question,
         answer_text=answer_text,
         wait_for_grade=False,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        is_adversarial=is_adversarial,
+        adversarial_reasons=adversarial_reasons,
     )
 
     return RedirectResponse(
@@ -565,9 +871,115 @@ async def submit_answer(
     )
 
 
+@app.post("/interview/{session_id}/rephrase", response_class=HTMLResponse)
+async def rephrase_interview_question(request: Request, session_id: str):
+    """Rephrases the current pending interview question upon candidate request."""
+    services = app.state.services
+    engine: InterviewEngine = services["engine"]
+    session_store: SessionStore = services["session_store"]
+    claim_store: ClaimStore = services["claim_store"]
+
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Interview session {session_id} not found")
+
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+
+    rephrased_q = engine.rephrase_current_question(
+        session_id=session_id,
+        client_ip=client_ip,
+        user_agent=user_agent,
+    )
+
+    if not rephrased_q:
+        rephrased_q = engine.get_next_question(session_id)
+
+    if not rephrased_q:
+        if request.headers.get("hx-request") == "true":
+            return HTMLResponse("")
+        return RedirectResponse(url=f"/interview/{session_id}", status_code=303)
+
+    # Check if this is an HTMX request
+    is_htmx = request.headers.get("hx-request") == "true"
+    if not is_htmx:
+        return RedirectResponse(url=f"/interview/{session_id}", status_code=303)
+
+    turns = session_store.get_turns_for_session(session_id)
+    claim_obj = claim_store.get_claim(rephrased_q.claim_id) if rephrased_q else None
+    target_claim_text = claim_obj.text if claim_obj else "Technical Claim"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/question_container.html",
+        context={
+            "session": session,
+            "current_question": rephrased_q,
+            "target_claim_text": target_claim_text,
+            "turns": turns,
+        },
+    )
+
+
+@app.get("/interview/{session_id}/rephrase")
+async def rephrase_get_fallback(session_id: str):
+    """Fallback redirect for GET requests to rephrase endpoint."""
+    return RedirectResponse(url=f"/interview/{session_id}", status_code=303)
+
+
+@app.get("/interview/{session_id}/logs", response_class=HTMLResponse)
+async def interview_logs(request: Request, session_id: str):
+    """Audit log viewer for an interview session."""
+    services = app.state.services
+    session_store: SessionStore = services["session_store"]
+    session_logger: SessionLogger = services["session_logger"]
+
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Interview session {session_id} not found")
+
+    logs = session_logger.get_session_logs(session_id)
+    security_event_count = sum(1 for log in logs if "SECURITY" in log.get("event_type", ""))
+
+    return templates.TemplateResponse(
+        request=request,
+        name="session_logs.html",
+        context={
+            "nav_active": "interview",
+            "session": session,
+            "events": logs,
+            "logs": logs,
+            "security_event_count": security_event_count,
+            "user_id": session.user_id,
+            "active_session": session if session.status == "active" else None,
+        },
+    )
+
+
+@app.get("/interview/{session_id}/logs/export")
+async def export_interview_logs(session_id: str):
+    """Exports structured audit logs as JSON."""
+    services = app.state.services
+    session_logger: SessionLogger = services["session_logger"]
+    session_store: SessionStore = services["session_store"]
+
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Interview session {session_id} not found")
+
+    json_data = session_logger.export_session_logs_json(session_id)
+    return Response(
+        content=json_data,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename=meritsentinel_audit_{session_id[:8]}.json"
+        },
+    )
+
+
 @app.get("/interview/{session_id}/grade_status", response_class=HTMLResponse)
-async def grade_status(session_id: str):
-    """HTMX polling endpoint returning background grading badge."""
+async def grade_status(session_id: str, was_pending: Optional[str] = None):
+    """HTMX polling endpoint returning background grading badge and refreshing turns when finished."""
     services = app.state.services
     session_store: SessionStore = services["session_store"]
 
@@ -577,18 +989,20 @@ async def grade_status(session_id: str):
     if has_pending:
         return HTMLResponse(
             f"""
-            <div id="grade-status" hx-get="/interview/{session_id}/grade_status" hx-trigger="every 1s" hx-swap="outerHTML" class="badge badge-pending">
+            <div id="grade-status" hx-get="/interview/{session_id}/grade_status?was_pending=1" hx-trigger="every 1s" hx-swap="outerHTML" class="badge badge-pending">
               ⏳ Background Grading Active
             </div>
             """
         )
     else:
+        headers = {"HX-Refresh": "true"} if was_pending == "1" else {}
         return HTMLResponse(
             """
             <div id="grade-status" class="badge badge-success">
               ✓ All Turns Graded
             </div>
-            """
+            """,
+            headers=headers,
         )
 
 
@@ -597,6 +1011,8 @@ async def dashboard(request: Request, user_id: str):
     """Mastery Matrix Dashboard displaying claims, verification badges, scores, and defensibility."""
     services = app.state.services
     claim_store: ClaimStore = services["claim_store"]
+    session_store: SessionStore = services["session_store"]
+    active_session = session_store.get_active_session_for_user(user_id)
 
     claims = claim_store.get_claims(user_id=user_id)
     matrix_rows = []
@@ -632,6 +1048,13 @@ async def dashboard(request: Request, user_id: str):
         })
 
     total_claims = len(claims)
+    interviewed_claims = [r for r in matrix_rows if r["answers_count"] > 0]
+    interviewed_verified = sum(1 for r in interviewed_claims if r["score"] >= 3)
+    interviewed_defensibility_pct = (
+        int(round((interviewed_verified / len(interviewed_claims) * 100)))
+        if interviewed_claims
+        else 0
+    )
     defensibility_pct = int(round((verified_count / total_claims * 100))) if total_claims > 0 else 0
 
     return templates.TemplateResponse(
@@ -645,7 +1068,10 @@ async def dashboard(request: Request, user_id: str):
             "partial_count": partial_count,
             "unverified_count": unverified_count,
             "defensibility_pct": defensibility_pct,
+            "interviewed_count": len(interviewed_claims),
+            "interviewed_defensibility_pct": interviewed_defensibility_pct,
             "matrix_rows": matrix_rows,
+            "active_session": active_session,
         },
     )
 
@@ -661,6 +1087,10 @@ SAMPLE_JD = """Looking for a Systems / Backend Software Engineer with experience
 @app.get("/tailor/{user_id}", response_class=HTMLResponse)
 async def tailor_page(request: Request, user_id: str):
     """Resume Tailoring and Strict Verifier screen."""
+    services = app.state.services
+    session_store: SessionStore = services["session_store"]
+    active_session = session_store.get_active_session_for_user(user_id)
+
     cached = getattr(app.state, "tailoring_cache", {}).get(user_id)
     jd_text = cached.get("jd_text") if cached else SAMPLE_JD
     gap_report = cached.get("gap_report") if cached else None
@@ -674,9 +1104,11 @@ async def tailor_page(request: Request, user_id: str):
             "nav_active": "tailor",
             "user_id": user_id,
             "jd_text": jd_text,
+            "sample_jd": SAMPLE_JD,
             "gap_report": gap_report,
             "verifier_report": verifier_report,
             "tailored_markdown": tailored_markdown,
+            "active_session": active_session,
         },
     )
 
@@ -690,6 +1122,8 @@ async def run_tailoring(
     """Runs deterministic requirement matching, tailoring engine, and strict verification."""
     services = app.state.services
     claim_store: ClaimStore = services["claim_store"]
+    session_store: SessionStore = services["session_store"]
+    active_session = session_store.get_active_session_for_user(user_id)
 
     claims = claim_store.get_claims(user_id=user_id)
     facts = claim_store.get_profile_facts(user_id=user_id)
@@ -741,9 +1175,11 @@ async def run_tailoring(
             "nav_active": "tailor",
             "user_id": user_id,
             "jd_text": jd_text,
+            "sample_jd": SAMPLE_JD,
             "gap_report": tailored_result.gap_report,
             "verifier_report": verifier_report,
             "tailored_markdown": tailored_result.tailored_markdown,
+            "active_session": active_session,
         },
     )
 
@@ -767,10 +1203,11 @@ async def download_markdown(user_id: str):
         )
 
     md_content = cached["tailored_markdown"]
+    safe_uid = sanitize_filename(user_id)
     return Response(
         content=md_content,
         media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="resume_{user_id}.md"'},
+        headers={"Content-Disposition": f'attachment; filename="resume_{safe_uid}.md"'},
     )
 
 
@@ -793,12 +1230,13 @@ async def download_pdf(user_id: str):
         )
 
     try:
-        export_dir = Path("D:/downloads")
+        export_dir = settings.export_dir
         export_dir.mkdir(parents=True, exist_ok=True)
     except Exception:
         export_dir = Path(tempfile.gettempdir())
 
-    pdf_path = export_dir / f"resume_{user_id}.pdf"
+    safe_uid = sanitize_filename(user_id)
+    pdf_path = export_dir / f"resume_{safe_uid}.pdf"
     export_pdf(
         markdown_content=cached["tailored_markdown"],
         verifier_report=verifier_report,
@@ -809,7 +1247,7 @@ async def download_pdf(user_id: str):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="resume_{user_id}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="resume_{safe_uid}.pdf"'},
     )
 
 

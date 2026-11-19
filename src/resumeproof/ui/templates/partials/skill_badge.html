@@ -1,0 +1,13 @@
+{% if s.status.value == 'confirmed' %}
+<button type="button" class="skill-badge active" id="skill-{{ s.id }}" hx-post="/review/{{ user_id }}/toggle_skill" hx-vals='{"claim_id": "{{ s.id }}"}' hx-swap="outerHTML show:none" title="Confirmed (Click to Reject)">
+  <span class="skill-dot confirmed"></span>{{ s.text }}
+</button>
+{% elif s.status.value == 'rejected' %}
+<button type="button" class="skill-badge inactive" id="skill-{{ s.id }}" hx-post="/review/{{ user_id }}/toggle_skill" hx-vals='{"claim_id": "{{ s.id }}"}' hx-swap="outerHTML show:none" title="Rejected (Click to Undo)">
+  <span class="skill-dot rejected"></span><span class="skill-strike">{{ s.text }}</span>
+</button>
+{% else %}
+<button type="button" class="skill-badge pending" id="skill-{{ s.id }}" hx-post="/review/{{ user_id }}/toggle_skill" hx-vals='{"claim_id": "{{ s.id }}"}' hx-swap="outerHTML show:none" title="Pending (Click to Confirm)">
+  <span class="skill-dot pending"></span>{{ s.text }}
+</button>
+{% endif %}

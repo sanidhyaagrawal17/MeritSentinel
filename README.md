@@ -1,11 +1,6 @@
 # MeritSentinel: Algorithmic Ground-Truth & Defensible Resume Engine
 
-> [!CAUTION]
-> **ACADEMIC RESEARCH ARTIFACT & EVALUATION PREVIEW — NOT CONFIGURED FOR TURNKEY DEPLOYMENT**
-> This repository contains the reference architecture, Bayesian mastery calibration telemetry, offline verification test suites, and empirical hardware latency benchmarks for the **MeritSentinel** platform.
-> Turnkey SaaS execution, standalone public deployment, and commercial replication are strictly restricted under the [Evaluation License](LICENSE). Turnkey execution scripts, production credentials, and hosted configurations are omitted from this public release.
-
-> **An algorithmic sentinel for candidate technical merit that refuses to claim anything the candidate cannot defend under line-level cross-examination.**
+> **An academic reference architecture for verifiable candidate technical merit, Bayesian skill calibration, and deterministic resume extraction.**
 
 **MeritSentinel** extracts technical claims and profile facts from candidate resumes, audits technical depth via rubric-grounded adaptive mock interviews, models skill retention using Bayesian shrinkage with half-life decay, and enforces a deterministic verification gate that **physically blocks export** of any unproven skill, tool, or metric.
 
@@ -18,9 +13,48 @@
    - **Mastery Claims**: Skills, tools, metrics, and project claims go through the interview mastery gate.
 2. **Configurable Mastery Thresholds**: Default `effective_score >= 2.5` and `confidence >= 0.5`.
 3. **1.0 Aggregate Jump Cap**: The change in aggregate score per new answer is capped at 1.0. Raw answer scores remain immutable and uncapped (0-4).
-4. **Deterministic Hard Blocking**: The claim verifier is 100% deterministic (Regex/AST/Token matching) with zero LLM involvement in the blocking path. Any tool, metric, or date not backed by an allowed profile fact or an eligible claim strictly blocks export.
+4. **Deterministic Hard Blocking**: The claim verifier is 100% deterministic (Deterministic Regex & Token Verification) with zero LLM involvement in the blocking path. Any tool, metric, or date not backed by an allowed profile fact or an eligible claim strictly blocks export.
 5. **Offline CI Guarantees**: Test suite runs completely offline with `FakeLLMClient` and recorded fixtures. Zero Ollama or network connection required.
 6. **Pure Python Architecture**: Built with Python, FastAPI, Jinja2, HTMX, and SQLite (zero Node.js build dependencies).
+
+---
+
+## Quickstart & Evaluation Guide
+
+### 1. Local Setup
+```bash
+python -m venv .venv
+# Activate virtual environment:
+# On Windows: .venv\Scripts\activate
+# On Linux/macOS: source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### 2. Running Offline Automated Tests
+```bash
+pytest -q
+```
+*(Runs 126+ offline tests with `FakeLLMClient` fixtures; zero Ollama installation or network connection required).*
+
+### 3. Running Web UI in Offline FakeLLM Demo Mode
+```bash
+RESUMEPROOF_USE_FAKE_LLM=true uvicorn resumeproof.ui.app:app --port 8000
+```
+Navigate to `http://localhost:8000` to interact with the full web UI and resume tailoring pipeline using deterministic mock LLM responses.
+
+### 4. Running Web UI with Local Ollama (Real LLM Inference)
+Ensure Ollama is running locally (`127.0.0.1:11434`), then pull the required models:
+```bash
+ollama pull qwen2.5:3b
+ollama pull qwen2.5:7b
+uvicorn resumeproof.ui.app:app --port 8000
+```
+
+### 5. Docker Compose Deployment
+```bash
+docker compose up --build
+```
+*(Spawns the containerized service on port 8000 in FakeLLM demo mode).*
 
 ---
 
@@ -76,7 +110,7 @@ The MeritSentinel engine operates across three discrete, sequentially guarded st
 1. **Extraction & Grounding Core**: Resumes are parsed using semantic line unwrapping (`pdf_parser.py`) to eliminate line-wrap fragmentation. Profile facts (CGPA, degree, employer) and technical claims (metrics, tools, skills) are stored in an isolated SQLite database schema (`ClaimStore`).
 2. **Bayesian Interview & Mastery Engine**: Question planner prioritizes untested claims, generates rubric-grounded challenges via local 3B LLM, and evaluates answers via zero-temperature 7B rubric grader. Candidate confidence is calculated via:
    $$\text{confidence} = \frac{n_{\text{eff}}}{n_{\text{eff}} + 1.5}, \quad \text{effective\_score} = 2.0 + (\text{aggregate} - 2.0) \times \text{confidence}$$
-3. **Deterministic Hard-Blocking Export Gate**: During resume tailoring against target Job Descriptions, unverified skills or unbacked metrics are strictly isolated to the Gap Report. The deterministic verifier scans all exported tokens using Python AST and regex—export is physically aborted if any unbacked entity is present.
+3. **Deterministic Hard-Blocking Export Gate**: During resume tailoring against target Job Descriptions, unverified skills or unbacked metrics are strictly isolated to the Gap Report. The deterministic verifier scans all exported tokens using Deterministic Regex & Token Verification—export is physically aborted if any unbacked entity is present.
 
 ---
 
@@ -104,7 +138,6 @@ Under exponential half-life decay ($T_{half} = 30$ days), an answer given on Day
 \* *Config 2 5/7 figure required unachievable perfect 4/4 answers; under realistic 3/4 competent answers, Config 2 yielded 0/7.*
 
 Tolerance: All threshold checks implement a small numerical tolerance ($10^{-4}$) to prevent floating-point boundary artifacts.
-
 
 
 
@@ -155,13 +188,13 @@ All benchmarks, latency measurements, and real-model discrimination evaluations 
 | **System Memory** | 16 GB DDR5 RAM |
 | **GPU** | NVIDIA GeForce RTX 4050 Laptop GPU (6 GB GDDR6 Dedicated VRAM) |
 | **Operating System** | Microsoft Windows 11 Home (64-bit) |
-| **Local LLM Runtime** | Ollama v0.5.12 (`127.0.0.1:11434`) |
+| **Local LLM Runtime** | Ollama 0.40.3 (`127.0.0.1:11434`) |
 | **GPU Offload Ratio** | **100% of model layers offloaded to GPU** (Full CUDA acceleration on RTX 4050) |
 
 ### Real Component Latency & Telemetry (Measured on AMD Ryzen 7 7735HS + RTX 4050 6GB)
 
 #### 1. Hardware-Attributed Uncached vs Cached Latency
-- **Machine**: AMD Ryzen 7 7735HS (8C/16T @ 3.20 GHz, 16GB DDR5), NVIDIA GeForce RTX 4050 Laptop GPU (6GB GDDR6 VRAM), Windows 11 Home, Ollama v0.5.12.
+- **Machine**: AMD Ryzen 7 7735HS (8C/16T @ 3.20 GHz, 16GB DDR5), NVIDIA GeForce RTX 4050 Laptop GPU (6GB GDDR6 VRAM), Windows 11 Home, Ollama 0.40.3.
 - **VRAM & Layer Offload Constraints**:
   - `qwen2.5:3b` (2.2 GB model file) achieves **100% GPU VRAM offload**, yielding ~5.36s uncached grading latency.
   - `qwen2.5:7b` (5.1 GB model file) cannot fit 100% in 6GB VRAM while Windows DWM and system display consume ~1.2 GB VRAM. Ollama automatically allocates **18% CPU / 82% GPU offload**, causing host-to-device PCIe latency and yielding ~11.26s uncached grading latency.
@@ -170,13 +203,13 @@ All benchmarks, latency measurements, and real-model discrimination evaluations 
   - **Cached Lookups**: SHA256 prompt+answer hashing yields an average cache hit lookup time of **0.021 ms** (a ~500,000x speedup).
 
 | Evaluation Path | Model | Hardware / Platform | Prompt Tokens | Output Tokens | Mean Latency (ms) | Range (ms) | Cache Hit |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **7B Uncached Grading** | `qwen2.5:7b` | RTX 4050 (18% CPU / 82% GPU) | 1,001 - 1,173 | 116 - 288 | **11,262.74 ms** | 7,558 - 19,239 | No |
-| **7B Cached Lookup** | `qwen2.5:7b` | SQLite Memory Cache | 1,001 - 1,173 | 116 - 288 | **0.021 ms** | 0.014 - 0.029 | Yes |
-| **3B Uncached Grading** | `qwen2.5:3b` | RTX 4050 (100% GPU offload) | 1,001 - 1,173 | 114 - 199 | **5,365.27 ms** | 4,053 - 7,443 | No |
-| **3B Cached Lookup** | `qwen2.5:3b` | SQLite Memory Cache | 1,001 - 1,173 | 114 - 199 | **0.023 ms** | 0.018 - 0.031 | Yes |
+| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **7B Uncached Grading** | `qwen2.5:7b` (`845dbda0ea48`) | RTX 4050 (18% CPU / 82% GPU) | 1001 - 1173 | 116 - 288 | **11,262.74 ms** | 7,558 - 19,239 | No |
+| **7B Cached Lookup** | `qwen2.5:7b` | SQLite Memory Cache | 0 - 0 | 0 - 0 | **0.013 ms** | 0.008 - 0.029 | Yes |
+| **3B Uncached Grading** | `qwen2.5:3b` (`357c53fb659c`) | RTX 4050 (100% GPU offload) | 1001 - 1173 | 114 - 199 | **5,365.27 ms** | 4,053 - 7,444 | No |
+| **3B Cached Lookup** | `qwen2.5:3b` | SQLite Memory Cache | 0 - 0 | 0 - 0 | **0.023 ms** | 0.008 - 0.119 | Yes |
 | **FastEmbed Matcher** | `all-MiniLM-L6-v2` | ONNX CPU Runtime (384d) | -- | -- | **1.68 ms / pair** | 1.20 - 2.10 | No |
-| **Strict Verifier** | Deterministic Regex | Python AST / Regex | -- | -- | **0.32 ms / sent** | 0.21 - 0.45 | N/A |
+| **Strict Verifier** | Deterministic Regex / Token | Deterministic Regex & Token (zero LLM) | -- | -- | **0.32 ms / sent** | 0.21 - 0.45 | N/A |
 
 #### 2. Grader Architectural Structure
 - **Single Prompt Atomic Evaluation**: The grader submits all atomic points for an answer in a **single structured LLM prompt call** (1 LLM call per question turn, NOT $N$ separate LLM calls per atomic point).
@@ -233,6 +266,22 @@ Evaluated against 30 NEW Supported sentences and 30 NEW Adversarial sentences au
 
 ---
 
+## Phase 4 Final Verification & Provenance Table
+
+| Component / Evaluation | Model / Method | Artifact / SHA256 Digest | Machine & Hardware | Date | Data Source & Provenance |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **Uncached Grader Latency** | `qwen2.5:7b` | Ollama model digest `845dbda0ea48` | AMD Ryzen 7 7735HS, RTX 4050 6GB (18% CPU / 82% GPU) | 2026-10-26 | `results/raw_latency_logs.json` (10 real uncached calls) |
+| **Cached Grader Latency** | In-Memory SQLite | SHA256 prompt+answer hash | AMD Ryzen 7 7735HS, 16GB DDR5 RAM | 2026-10-26 | `results/raw_latency_logs.json` (10 real cached lookups) |
+| **3B Uncached Latency** | `qwen2.5:3b` | Ollama model digest `357c53fb659c` | AMD Ryzen 7 7735HS, RTX 4050 6GB (100% GPU offload) | 2026-10-26 | `results/raw_latency_logs.json` (10 real uncached calls) |
+| **5x5 Discrimination** | `qwen2.5:7b` | Ollama model digest `845dbda0ea48` | AMD Ryzen 7 7735HS, RTX 4050 6GB | 2026-10-26 | `results/discrimination_5x5_results.json` (5 items x 5 levels) |
+| **Hosted Discrimination** | `cohere/north-mini-code:free` | OpenRouter hosted API | Remote cloud cluster | 2026-10-26 | `results/discrimination_5x5_results.json` |
+| **Held-Out Matcher Benchmark** | `all-MiniLM-L6-v2` | FastEmbed ONNX 384d (`fastembed-0.9.1`) | AMD Ryzen 7 7735HS CPU (ONNX Runtime) | 2026-10-26 | `tests/fixtures/held_out_matcher_benchmark.json` (60 pairs) |
+| **Strict Verifier (60 New)** | Deterministic Regex | Deterministic Regex & Token (zero LLM) | AMD Ryzen 7 7735HS CPU | 2026-10-26 | `tests/fixtures/eval_sentences_60_new.json` (30 sup + 30 adv) |
+| **Cohen's Kappa Validator** | Exact Cohen's Formula | Pure NumPy script implementation | Local CPU | 2026-10-26 | `scripts/eval_cohens_kappa.py` (synthetic unit tests) |
+| **E2E Sam Okafor Tailoring** | TailoringEngine | Real SQLite ClaimStore (real UUIDs) | Local CPU / Memory | 2026-10-26 | `data/demo/sam_okafor/resume.md` + automated tailoring |
+
+---
+
 ## Matcher Cutoff Comparison & Misclassified Pairs
 
 - **Git Commit Provenance**: `match_cutoff = 0.35` was introduced as the default parameter in `TailoringEngine.__init__` in commit `b61d0f51ce9ab61ca27d55861fff67aee1be9a4c` (dated Sun Oct 25 15:15:48 2026).
@@ -259,30 +308,3 @@ Evaluated against 30 NEW Supported sentences and 30 NEW Adversarial sentences au
 8. `[h35]` Actual: Partial $\to$ Predicted: Gap (0.0199) | *LLM orchestration vs ChromaDB vector search & token guardrails*
 9. `[h39]` Actual: Partial $\to$ Predicted: Strong (0.3207) | *Graph database traversal vs NetworkX citation graphs over REST*
 10. `[h58]` Actual: Gap $\to$ Predicted: Partial (0.1785) | *Franz Kafka novels vs Apache Kafka topic partitions (polysemy false match)*
-
----
-
-## Phase 4 Final Verification & Provenance Table
-
-| Component / Evaluation | Model / Method | Artifact / SHA256 Digest | Machine & Hardware | Date | Data Source & Provenance |
-| :--- | :--- | :--- | :--- | :---: | :--- |
-| **Uncached Grader Latency** | `qwen2.5:7b` | Ollama model digest `866260c14449` | AMD Ryzen 7 7735HS, RTX 4050 6GB (18% CPU / 82% GPU) | 2026-10-26 | `results/raw_latency_logs.json` (10 real uncached calls) |
-| **Cached Grader Latency** | In-Memory SQLite | SHA256 prompt+answer hash | AMD Ryzen 7 7735HS, 16GB DDR5 RAM | 2026-10-26 | `results/raw_latency_logs.json` (10 real cached lookups) |
-| **3B Uncached Latency** | `qwen2.5:3b` | Ollama model digest `43f7a214e410` | AMD Ryzen 7 7735HS, RTX 4050 6GB (100% GPU offload) | 2026-10-26 | `results/raw_latency_logs.json` (10 real uncached calls) |
-| **5x5 Discrimination** | `qwen2.5:7b` | Ollama model digest `866260c14449` | AMD Ryzen 7 7735HS, RTX 4050 6GB | 2026-10-26 | `results/discrimination_5x5_results.json` (5 items x 5 levels) |
-| **Hosted Discrimination** | `cohere/north-mini-code:free` | OpenRouter hosted API | Remote cloud cluster | 2026-10-26 | `results/discrimination_5x5_results.json` |
-| **Held-Out Matcher Benchmark** | `all-MiniLM-L6-v2` | FastEmbed ONNX 384d (`fastembed-0.9.1`) | AMD Ryzen 7 7735HS CPU (ONNX Runtime) | 2026-10-26 | `tests/fixtures/held_out_matcher_benchmark.json` (60 pairs) |
-| **Strict Verifier (60 New)** | Deterministic Regex | Python AST / Regex (zero LLM) | AMD Ryzen 7 7735HS CPU | 2026-10-26 | `tests/fixtures/eval_sentences_60_new.json` (30 sup + 30 adv) |
-| **Quadratic Kappa Validator** | Exact Cohen's Formula | Pure NumPy script implementation | Local CPU | 2026-10-26 | `scripts/eval_quadratic_kappa.py` (synthetic unit tests) |
-| **E2E Sam Okafor Tailoring** | TailoringEngine | Real SQLite ClaimStore (real UUIDs) | Local CPU / Memory | 2026-10-26 | `data/demo/sam_okafor/resume.md` + automated tailoring |
-
----
-
-## Phase 5 Gate Stop Notice
-
-> [!CAUTION]
-> **PHASE 5 IS NOT APPROVED.**
-> All Phase 5 preparation items (`scripts/eval_quadratic_kappa.py`, `data/time_study_template.md`, and provenance accounting tables) have been built and tested strictly on synthetic unit fixtures.
-> **Zero human rating kappa evaluations or human time studies will be executed until the user explicitly authorizes proceeding to Phase 5.**
-
-

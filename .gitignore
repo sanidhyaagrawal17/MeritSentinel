@@ -12,6 +12,10 @@ build/
 .cache/
 *.db
 *.sqlite3
+*.db-wal
+*.db-shm
+.env
+.data_exports/
 results/benchmark_local_*.json
 data/local/
 local_data/

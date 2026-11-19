@@ -58,6 +58,26 @@ class ClaimStore:
 
     def save_profile_fact(self, fact: ProfileFact) -> None:
         with self.db.transaction() as conn:
+            existing = conn.execute(
+                "SELECT id, is_confirmed, user_correction, confirmed_at FROM profile_facts WHERE user_id = ? AND fact_type = ?",
+                (fact.user_id, fact.fact_type.value)
+            ).fetchone()
+            if existing:
+                # Update existing fact value without duplicating the fact card
+                fact.id = existing["id"]
+                fact.is_confirmed = bool(existing["is_confirmed"])
+                fact.user_correction = existing["user_correction"]
+                fact.confirmed_at = datetime.fromisoformat(existing["confirmed_at"]) if existing["confirmed_at"] else None
+                conn.execute(
+                    """
+                    UPDATE profile_facts
+                    SET value = ?, source_line = ?, source_page = ?
+                    WHERE id = ?
+                    """,
+                    (fact.value, fact.source_line, fact.source_page, fact.id)
+                )
+                return
+
             conn.execute(
                 """
                 INSERT OR REPLACE INTO profile_facts (
@@ -268,7 +288,15 @@ class ClaimStore:
                 (action.value, new_text, new_tools, new_metrics, claim_id)
             )
 
-            # Update or create audit log
+            # Preserve original extractor provenance across repeated edits
+            existing_audit = conn.execute(
+                "SELECT extractor_text, extractor_tools, extractor_metrics FROM claim_audits WHERE claim_id = ?",
+                (claim_id,),
+            ).fetchone()
+            orig_text = existing_audit["extractor_text"] if existing_audit else claim_row["text"]
+            orig_tools = existing_audit["extractor_tools"] if existing_audit else claim_row["tools"]
+            orig_metrics = existing_audit["extractor_metrics"] if existing_audit else claim_row["metric_values"]
+
             conn.execute(
                 """
                 INSERT OR REPLACE INTO claim_audits (
@@ -280,9 +308,9 @@ class ClaimStore:
                 (
                     f"audit_{claim_id}",
                     claim_id,
-                    claim_row["text"],
-                    claim_row["tools"],
-                    claim_row["metric_values"],
+                    orig_text,
+                    orig_tools,
+                    orig_metrics,
                     user_correction_text,
                     json.dumps(user_correction_tools) if user_correction_tools is not None else None,
                     json.dumps(user_correction_metrics) if user_correction_metrics is not None else None,
@@ -338,6 +366,14 @@ class ClaimStore:
             conn.execute(
                 "UPDATE profile_facts SET is_confirmed = 1, confirmed_at = ? WHERE user_id = ?",
                 (now, user_id)
+            )
+
+    def reset_all_facts(self, user_id: str) -> None:
+        """Resets all profile facts for a user back to unconfirmed (Undo All Facts)."""
+        with self.db.transaction() as conn:
+            conn.execute(
+                "UPDATE profile_facts SET is_confirmed = 0, confirmed_at = NULL WHERE user_id = ?",
+                (user_id,)
             )
 
     def get_claim(self, claim_id: str) -> Optional[Claim]:
@@ -521,7 +557,8 @@ class ClaimStore:
                     """
                     SELECT c.* FROM claims c
                     JOIN mastery_states m ON c.id = m.claim_id
-                    WHERE c.user_id = ? AND m.effective_score >= ? AND m.confidence >= ?
+                    WHERE c.user_id = ? AND c.status IN ('confirmed', 'edited')
+                      AND m.effective_score >= ? AND m.confidence >= ?
                     """,
                     (user_id, eff_t, conf_t)
                 ).fetchall()
@@ -530,7 +567,8 @@ class ClaimStore:
                     """
                     SELECT c.* FROM claims c
                     JOIN mastery_states m ON c.id = m.claim_id
-                    WHERE c.user_id = ? AND m.is_eligible = 1
+                    WHERE c.user_id = ? AND c.status IN ('confirmed', 'edited')
+                      AND m.is_eligible = 1
                     """,
                     (user_id,)
                 ).fetchall()

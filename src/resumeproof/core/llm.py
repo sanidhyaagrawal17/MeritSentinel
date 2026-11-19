@@ -62,12 +62,12 @@ class OpenAICompatibleClient(LLMClient):
         self.ollama_endpoint = f"{self.base_url}/api/chat"
         self._tested_json_schema_support: Optional[bool] = None
         self._model_digests: dict[str, str] = {}
-        if "11434" in self.base_url or "localhost" in self.base_url or "127.0.0.1" in self.base_url:
-            self._load_model_digests()
+        self._digests_loaded: bool = False
 
     def _load_model_digests(self) -> None:
+        self._digests_loaded = True
         try:
-            with httpx.Client(timeout=3.0) as client:
+            with httpx.Client(timeout=2.0) as client:
                 resp = client.get(f"{self.base_url}/api/tags")
                 if resp.status_code == 200:
                     data = resp.json()
@@ -86,7 +86,10 @@ class OpenAICompatibleClient(LLMClient):
     def get_model_digest(self, model: str) -> Optional[str]:
         if model in self._model_digests:
             return self._model_digests[model]
-        self._load_model_digests()
+        if not self._digests_loaded and (
+            "11434" in self.base_url or "localhost" in self.base_url or "127.0.0.1" in self.base_url
+        ):
+            self._load_model_digests()
         return self._model_digests.get(model)
 
     def chat_completion(
@@ -178,10 +181,12 @@ class OpenAICompatibleClient(LLMClient):
                         logger.warning(
                             f"/v1/chat/completions json_schema returned status {resp.status_code}: {resp.text}."
                         )
-                        self._tested_json_schema_support = False
+                        if resp.status_code in (400, 404, 422):
+                            self._tested_json_schema_support = False
             except Exception as e:
                 logger.warning(f"Failed calling /v1 json_schema ({e}).")
-                self._tested_json_schema_support = False
+                if isinstance(e, (ValueError, KeyError)):
+                    self._tested_json_schema_support = False
 
         # Step 2: Fallback path based on server type
         # If local Ollama server, use native format parameter on /api/chat
@@ -287,16 +292,32 @@ class FakeLLMClient(LLMClient):
             total_tokens=20,
             latency_ms=1.0,
         ))
-        # Look for fixture match
         msg_str = " ".join(m.get("content", "") for m in messages)
-        for k, v in self.recorded_fixtures.items():
-            if k in msg_str:
-                return v if isinstance(v, str) else json.dumps(v)
 
+        # Check for rephrase request
+        if "rephrase" in msg_str.lower() or "simplify" in msg_str.lower():
+            return "Could you explain in simpler terms how you designed and tested this component in your project?"
+
+        # Check for technical interview question generation
         if "interview" in msg_str.lower() or "candidate claim:" in msg_str.lower():
+            import re
+            past_match = re.search(r"Questions already asked in this session:[^\n]*\n([\s\S]*?)(?:\n\n|\n[A-Z])", msg_str, re.IGNORECASE)
+            past_q_count = 0
+            if past_match:
+                past_lines = [line.strip() for line in past_match.group(1).splitlines() if line.strip().startswith("-")]
+                past_q_count = len(past_lines)
+
+            claim_match = re.search(r"Candidate Claim:\s*([^\n]+)", msg_str, re.IGNORECASE)
+            claim_snippet = claim_match.group(1).strip() if claim_match else "this system"
+
             if "follow-up focus:" in msg_str.lower():
-                return "Could you specify the exact connection pooling parameters and explain how you prevented lock contention under peak load?"
-            return "How did you configure and benchmark this component, and what specific architectural constraints did you encounter?"
+                return f"Could you specify the exact connection pooling parameters and explain how you prevented lock contention under peak load? (Q{past_q_count + 1})"
+            return f"Regarding your claim '{claim_snippet[:50]}': How did you configure, benchmark, and deploy this in production? (Turn {past_q_count + 1})"
+
+        # Look for explicit string fixture match (excluding structured JSON dumps)
+        for k, v in self.recorded_fixtures.items():
+            if isinstance(v, str) and not v.startswith("{") and k in msg_str:
+                return v
 
         return "Deterministic response from FakeLLMClient."
 
@@ -397,7 +418,7 @@ class FakeLLMClient(LLMClient):
                         "matched_rubric_ids": rubric_ids[:1],
                         "missed_rubric_ids": rubric_ids[1:],
                     }
-            elif any(s in ans_snippet for s in ["locust test", "checkpointing", "write-ahead logging", "single-node", "350 read req/sec"]):
+            elif any(s in ans_snippet for s in ["locust test", "checkpointing", "write-ahead logging", "single-node", "350 read req/sec", "wal (write-ahead logging)", "task-tracker api"]):
                 quote_part = "tuned SQLAlchemy connection pooling to 10 connections" if "10 connections" in raw_ans else raw_ans[:50]
                 points = [
                     {"point_id": pid, "matched": True, "evidence_quote": quote_part}

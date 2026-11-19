@@ -1,5 +1,6 @@
 """Question planner implementing priority order (untested > weak > stale) and follow-up logic."""
 
+import re
 from typing import Optional
 from resumeproof.schemas.claims import Claim
 from resumeproof.schemas.mastery import MasteryState
@@ -45,12 +46,29 @@ class QuestionPlanner:
         if self.followup_counts.get(claim_id, 0) >= self.max_followups_per_claim:
             return False, None
 
+        if self.questions_per_claim.get(claim_id, 0) >= 2:
+            return False, None
+
         words = answer_text.strip().split()
+        ans_lower = answer_text.strip().lower()
+
+        # Invariant: If candidate explicitly stated they don't know, have no idea, or pass,
+        # never trap them in a circular follow-up on the same question. Move on to another claim!
+        no_knowledge_markers = (
+            "no idea", "don't know", "dont know", "do not know", "not sure",
+            "no clue", "cannot recall", "can't recall", "don't remember",
+            "dont remember", "skip", "pass", "i didn't do this", "i did not do this",
+            "not familiar", "have not worked on", "haven't worked on", "none",
+            "na", "n/a", "no answer", "idk", "haven't done", "have not done"
+        )
+        if len(words) <= 12 and any(re.search(rf"(?<![a-z0-9]){re.escape(marker)}(?![a-z0-9])", ans_lower) for marker in no_knowledge_markers):
+            return False, None
+
         if len(words) < 15:
-            return True, "Answer was terse and lacked technical specifics. Probe for concrete architectural mechanics."
+            return True, "Candidate response was terse and brief. Ask an approachable follow-up question inviting them to explain their implementation steps or code structure in their own words."
 
         if last_score is not None and last_score <= 1:
-            return True, "Answer scored 1 or lower due to vague concepts or missing verification. Request specific parameters and trade-offs."
+            return True, "Candidate gave a vague or incomplete answer. Ask a simpler, more direct follow-up question about the tools, functions, or steps they used."
 
         return False, None
 

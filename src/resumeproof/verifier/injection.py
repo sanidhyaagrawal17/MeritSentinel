@@ -40,7 +40,7 @@ MAGNITUDES = {
 
 PROMPT_INJECTION_PATTERNS = [
     r"ignore\s+(all\s+)?(previous|prior)\s+(instructions|rules|prompts)",
-    r"add\s+([a-zA-Z0-9_\-\s]+)\s+(experience|skill|project)",
+    r"\badd\s+(?:\d+\+?\s+years?\s+(?:of\s+)?|fake\s+|fabricated\s+|unverified\s+)[a-zA-Z0-9_\-\s]{1,40}\b(experience|skill|project)s?\b",
     r"disregard\s+(the\s+)?(above|previous|system)",
     r"mark\s+(all\s+)?(claims?|statements?)\s+(as\s+)?(verified|valid|true)",
     r"system\s*:\s*you\s+are",

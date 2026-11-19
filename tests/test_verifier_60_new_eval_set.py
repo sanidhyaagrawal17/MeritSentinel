@@ -39,7 +39,7 @@ def full_candidate_profile(test_candidate_profile):
         Claim(id="c_sk_ec2", user_id="u1", claim_type=ClaimType.SKILL, text="AWS EC2", tools=["AWS EC2"], status=ClaimStatus.CONFIRMED),
         Claim(id="c_sk_gemini", user_id="u1", claim_type=ClaimType.SKILL, text="Google Antigravity (Gemini)", tools=["Google Antigravity (Gemini)", "Google Antigravity", "Gemini"], status=ClaimStatus.CONFIRMED),
         # Competitions and achievements
-        Claim(id="c_ach_1", user_id="u1", claim_type=ClaimType.ACHIEVEMENT, text="Winner of the Medi-Caps University Internal Hackathon 2025 across 120 participating teams.", tools=[], metric_values=["120", "2025"], status=ClaimStatus.CONFIRMED),
+        Claim(id="c_ach_1", user_id="u1", claim_type=ClaimType.ACHIEVEMENT, text="Winner of the Pacific Coast Institute of Technology Internal Hackathon 2025 across 120 participating teams.", tools=[], metric_values=["120", "2025"], status=ClaimStatus.CONFIRMED),
         Claim(id="c_ach_2", user_id="u1", claim_type=ClaimType.ACHIEVEMENT, text="Top 50 Finalist at the college level in Smart India Hackathon 2025 out of 300+ submissions.", tools=[], metric_values=["50", "2025", "300"], status=ClaimStatus.CONFIRMED),
         Claim(id="c_ach_3", user_id="u1", claim_type=ClaimType.ACHIEVEMENT, text="Participant in TATA AIG InnoVent 2026 national competition.", tools=[], metric_values=["2026"], status=ClaimStatus.CONFIRMED),
         # Experience claims

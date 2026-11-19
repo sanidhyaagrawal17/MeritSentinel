@@ -1,0 +1,16 @@
+<div id="claim-{{ c.id }}" class="resume-bullet-row claim-row editing" data-id="{{ c.id }}">
+  <form hx-post="/review/{{ user_id }}/save_claim_edit" hx-target="#claim-{{ c.id }}" hx-swap="outerHTML show:none" class="claim-edit-form">
+    <input type="hidden" name="claim_id" value="{{ c.id }}">
+    <input type="hidden" name="persona" value="{{ persona_id or '' }}">
+    <div class="claim-edit-label">Edit Technical Claim Statement</div>
+    <textarea name="edited_text" class="claim-edit-textarea" required>{{ c.text }}</textarea>
+    <div class="claim-edit-actions">
+      <button type="button" class="btn btn-secondary btn-xs" hx-get="/review/{{ user_id }}/cancel_claim_edit?claim_id={{ c.id }}&persona={{ persona_id or '' }}" hx-target="#claim-{{ c.id }}" hx-swap="outerHTML show:none">
+        Cancel
+      </button>
+      <button type="submit" class="btn btn-primary btn-xs">
+        ✓ Save Changes
+      </button>
+    </div>
+  </form>
+</div>

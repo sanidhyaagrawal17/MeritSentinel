@@ -1,0 +1,114 @@
+<div id="claim-{{ c.id }}" class="resume-bullet-row claim-row status-{{ c.status.value }}" data-id="{{ c.id }}" data-type="{{ c.claim_type.value }}" data-project="{{ c.project_id or '' }}" data-status="{{ c.status.value }}" tabindex="0">
+  <div class="bullet-main">
+    <span class="bullet-status-dot {% if c.status.value == 'confirmed' %}confirmed{% elif c.status.value == 'rejected' %}rejected{% else %}pending{% endif %}" title="{{ c.status.value|capitalize }}"></span>
+    <div class="bullet-body">
+      <div class="claim-text" id="claim-text-{{ c.id }}">{{ c.text }}</div>
+      <div class="bullet-meta-line">
+        <span class="meta-token meta-type">{{ c.claim_type.value }}</span>
+        {% if c.project_id %}
+        <span class="meta-sep">&middot;</span>
+        <span class="meta-token meta-proj"><code>{{ c.project_id }}</code></span>
+        {% endif %}
+        {% for t in c.tools %}
+        <span class="meta-token meta-tool">{{ t }}</span>
+        {% endfor %}
+        {% for m in c.metric_values %}
+        <span class="meta-token meta-metric">{{ m }}</span>
+        {% endfor %}
+        {% if c.source_line %}
+        <span class="meta-sep">&middot;</span>
+        <span class="meta-token meta-source">L{{ c.source_line }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bullet-actions-cluster">
+    <span class="bullet-state-label {% if c.status.value == 'confirmed' %}confirmed{% elif c.status.value == 'rejected' %}rejected{% else %}pending{% endif %}">
+      {% if c.status.value == 'confirmed' %}Confirmed{% elif c.status.value == 'rejected' %}Rejected{% else %}Pending{% endif %}
+    </span>
+
+    <div class="bullet-btn-group">
+      {% if c.status.value == 'confirmed' %}
+      <button
+        type="button"
+        class="btn-micro btn-micro-undo"
+        hx-post="/review/{{ user_id }}/reset_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Reset to Pending (U)"
+        aria-label="Reset to Pending">
+        ↺
+      </button>
+      <button
+        type="button"
+        class="btn-micro btn-micro-reject"
+        hx-post="/review/{{ user_id }}/reject_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Reject Claim (R)"
+        aria-label="Reject Claim">
+        ✕
+      </button>
+      {% elif c.status.value == 'rejected' %}
+      <button
+        type="button"
+        class="btn-micro btn-micro-undo"
+        hx-post="/review/{{ user_id }}/reset_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Reset to Pending (U)"
+        aria-label="Reset to Pending">
+        ↺
+      </button>
+      <button
+        type="button"
+        class="btn-micro btn-micro-confirm"
+        hx-post="/review/{{ user_id }}/confirm_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Confirm Claim (C)"
+        aria-label="Confirm Claim">
+        ✓
+      </button>
+      {% else %}
+      <button
+        type="button"
+        class="btn-micro btn-micro-confirm"
+        hx-post="/review/{{ user_id }}/confirm_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Confirm Claim (C)"
+        aria-label="Confirm Claim">
+        ✓
+      </button>
+      <button
+        type="button"
+        class="btn-micro btn-micro-reject"
+        hx-post="/review/{{ user_id }}/reject_claim"
+        hx-vals='{"claim_id": "{{ c.id }}", "persona": "{{ persona_id or "" }}"}'
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Reject Claim (R)"
+        aria-label="Reject Claim">
+        ✕
+      </button>
+      {% endif %}
+      <button
+        type="button"
+        class="btn-micro btn-micro-edit"
+        hx-get="/review/{{ user_id }}/claim_edit_form?claim_id={{ c.id }}&persona={{ persona_id or "" }}"
+        hx-target="#claim-{{ c.id }}"
+        hx-swap="outerHTML show:none"
+        title="Edit Claim Statement (E)"
+        aria-label="Edit Claim Statement">
+        ✎
+      </button>
+    </div>
+  </div>
+</div>

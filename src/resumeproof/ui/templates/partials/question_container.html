@@ -1,0 +1,72 @@
+<div id="active-question-container">
+  <!-- Status & Metadata Row -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+      <span class="badge badge-neutral">Turn {{ (turns|length + 1) }} of {{ session.budget }}</span>
+      <span class="badge badge-warning">Priority: {{ current_question.priority.value }}</span>
+      {% if current_question.is_followup %}
+      <span class="badge badge-danger">Follow-up</span>
+      {% endif %}
+      {% if current_question.is_rephrased %}
+      <span class="badge badge-success" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">✓ Rephrased for Clarity</span>
+      {% endif %}
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      {% if current_question.latency_ms %}
+      <span style="font-size: 0.75rem; color: var(--text-muted);">Generated in {{ current_question.latency_ms|round(1) }}ms</span>
+      {% endif %}
+      <button 
+        type="button" 
+        id="btn-rephrase-question" 
+        class="btn btn-secondary btn-xs"
+        hx-post="/interview/{{ session.id }}/rephrase"
+        hx-target="#active-question-container"
+        hx-swap="outerHTML"
+        hx-indicator="#rephrase-loading"
+        style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; padding: 0.28rem 0.65rem;"
+        title="Request a simpler, more direct rephrasing of this technical question">
+        <span>🔄 Rephrase Question</span>
+      </button>
+      <span id="rephrase-loading" class="htmx-indicator" style="font-size: 0.75rem; color: #38bdf8;">
+        Rephrasing...
+      </span>
+    </div>
+  </div>
+
+  <!-- Target Claim Box -->
+  <div style="margin-bottom: 1.5rem;">
+    <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem;">Target Claim</div>
+    <div style="color: #d4d4d8; font-size: 0.95rem; background: rgba(255, 255, 255, 0.03); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--surface-border);">
+      {{ target_claim_text }}
+    </div>
+  </div>
+
+  <!-- Technical Question Box -->
+  <div style="margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent-color); font-weight: 600;">Technical Interview Question</div>
+    </div>
+    <div style="font-size: 1.2rem; font-weight: 600; color: #fff; line-height: 1.4;" id="question-text-display">
+      {{ current_question.question_text }}
+    </div>
+
+    {% if current_question.is_rephrased and current_question.original_question_text %}
+    <details style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+      <summary style="cursor: pointer; user-select: none;">Show original phrasing</summary>
+      <div style="margin-top: 0.35rem; padding: 0.5rem 0.75rem; background: rgba(255, 255, 255, 0.02); border-left: 2px solid var(--surface-border); border-radius: 2px; font-style: italic; color: #a1a1aa;">
+        "{{ current_question.original_question_text }}"
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  <!-- Hidden Form Fields for Submission -->
+  <input type="hidden" name="question_id" value="{{ current_question.id }}">
+  <input type="hidden" name="claim_id" value="{{ current_question.claim_id }}">
+  <input type="hidden" name="priority" value="{{ current_question.priority.value }}">
+  <input type="hidden" name="question_text" value="{{ current_question.question_text }}">
+  <input type="hidden" name="is_followup" value="{{ '1' if current_question.is_followup else '0' }}">
+  <input type="hidden" name="rubric_id" value="{{ current_question.rubric_id or '' }}">
+  <input type="hidden" name="project_id" value="{{ current_question.project_id or '' }}">
+</div>

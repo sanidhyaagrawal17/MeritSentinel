@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}ResumeProof | Tailor & Strict Verifier{% endblock %}
+{% block title %}MeritSentinel | Tailor & Strict Verifier{% endblock %}
 
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem;">
@@ -26,7 +26,15 @@
 
   <form action="/tailor/{{ user_id }}" method="POST">
     <div class="form-group">
-      <label for="jd_text">Job Description / Requirements Specification</label>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem;">
+        <label for="jd_text" style="margin: 0;">Job Description / Requirements Specification</label>
+        {% if sample_jd %}
+        <button type="button" class="btn-quiet-link" onclick="document.getElementById('jd_text').value = document.getElementById('sample-jd-template').value;">
+          Load Sample JD
+        </button>
+        <textarea id="sample-jd-template" style="display: none;">{{ sample_jd }}</textarea>
+        {% endif %}
+      </div>
       <textarea id="jd_text" name="jd_text" rows="7" placeholder="Paste requirements here (e.g., 'Looking for a backend engineer experienced in building REST APIs with FastAPI, SQLite connection pooling, and low-latency socket networking...')" required>{{ jd_text or "" }}</textarea>
     </div>
     <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">

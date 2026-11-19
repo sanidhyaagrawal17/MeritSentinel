@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}MeritSentinel | Session Audit Logs{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem;">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+      <a href="/interview/{{ session.id }}" class="btn btn-secondary btn-sm">&larr; Back to Interview</a>
+      <span class="badge badge-neutral">Session {{ session.id[:8] }}</span>
+      {% if session.status == 'completed' %}
+      <span class="badge badge-success">Completed</span>
+      {% else %}
+      <span class="badge badge-warning">Active In-Progress</span>
+      {% endif %}
+    </div>
+    <h1 style="margin: 0 0 0.25rem 0;">Cryptographic Session Audit Log</h1>
+    <p class="subtitle" style="margin-bottom: 0;">Immutable, tamper-evident chronological event log for interview compliance, prompt defense, and mastery audit.</p>
+  </div>
+  <div style="display: flex; gap: 0.75rem;">
+    <a href="/interview/{{ session.id }}/logs/export" class="btn btn-secondary btn-sm" download>
+      &darr; Export JSON Log
+    </a>
+    <a href="/dashboard/{{ session.user_id }}" class="btn btn-primary btn-sm">
+      Mastery Dashboard &rarr;
+    </a>
+  </div>
+</div>
+
+<!-- Session Metadata Metrics -->
+<div class="metrics-grid" style="margin-bottom: 2rem;">
+  <div class="metric-card">
+    <div class="metric-card-label">Total Events Logged</div>
+    <div class="metric-card-value">{{ events|length }}</div>
+    <div class="metric-card-delta">Chronological append-only</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-card-label">Interview Turns</div>
+    <div class="metric-card-value">{{ session.turns|length }} / {{ session.budget }}</div>
+    <div class="metric-card-delta">{{ (session.turns|length / session.budget * 100)|int }}% budget consumed</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-card-label">Candidate Persona</div>
+    <div class="metric-card-value" style="font-size: 1.25rem;">{{ session.persona_id }}</div>
+    <div class="metric-card-delta">User: <code>{{ session.user_id }}</code></div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-card-label">Security Alerts</div>
+    {% set alert_count = events | selectattr('severity', 'equalto', 'SECURITY_ALERT') | list | length %}
+    <div class="metric-card-value" style="color: {% if alert_count > 0 %}#f87171{% else %}#34d399{% endif %};">
+      {{ alert_count }}
+    </div>
+    <div class="metric-card-delta">{% if alert_count > 0 %}Adversarial attempt neutralized{% else %}Zero security violations{% endif %}</div>
+  </div>
+</div>
+
+<!-- Event Table Card -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--surface-border); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h2 style="margin: 0; font-size: 1.15rem;">Immutable Event Stream</h2>
+    </div>
+    <span style="font-size: 0.8rem; color: var(--text-muted);">Stored in SQLite table <code>session_audit_logs</code></span>
+  </div>
+
+  <div class="table-wrapper" style="margin: 0; border: none; border-radius: 0;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 140px;">Timestamp</th>
+          <th style="width: 190px;">Event Type</th>
+          <th style="width: 100px;">Severity</th>
+          <th>Details & Structured Payload</th>
+          <th style="width: 120px;">Client IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ev in events %}
+        <tr style="{% if ev.severity == 'SECURITY_ALERT' %}background: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444;{% endif %}">
+          <td style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">
+            {{ ev.timestamp.split('T')[1].split('.')[0] if 'T' in ev.timestamp else ev.timestamp }}
+          </td>
+          <td>
+            {% if ev.event_type == 'SECURITY_INJECTION_DETECTED' %}
+            <span class="badge badge-danger">🛡️ {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'SESSION_START' %}
+            <span class="badge badge-neutral">🚀 {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'QUESTION_GENERATED' or ev.event_type == 'QUESTION_SERVED' %}
+            <span class="badge badge-warning">❓ {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'ANSWER_SUBMITTED' %}
+            <span class="badge badge-neutral">✍️ {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'GRADE_RECORDED' %}
+            <span class="badge badge-success">⭐ {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'MASTERY_SYNCHRONIZED' %}
+            <span class="badge badge-success">📈 {{ ev.event_type }}</span>
+            {% elif ev.event_type == 'SESSION_COMPLETED' %}
+            <span class="badge badge-success">🏁 {{ ev.event_type }}</span>
+            {% else %}
+            <span class="badge badge-neutral">{{ ev.event_type }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if ev.severity == 'SECURITY_ALERT' %}
+            <span class="badge badge-danger">ALERT</span>
+            {% elif ev.severity == 'WARN' %}
+            <span class="badge badge-warning">WARN</span>
+            {% else %}
+            <span class="badge badge-neutral" style="opacity: 0.7;">INFO</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-size: 0.85rem; line-height: 1.45;">
+              {% if ev.event_type == 'QUESTION_GENERATED' or ev.event_type == 'QUESTION_SERVED' %}
+                <div style="color: #fff; font-weight: 500;">{{ ev.payload.question_text }}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                  Claim: <code>{{ ev.payload.claim_id }}</code> &bull; Priority: {{ ev.payload.priority }} &bull; Turn: {{ ev.payload.turn_index }}
+                  {% if ev.payload.reused_pending %}<span class="badge badge-warning" style="font-size: 0.65rem; margin-left: 0.35rem;">Reused Pending (Refresh Resistant)</span>{% endif %}
+                </div>
+              {% elif ev.event_type == 'ANSWER_SUBMITTED' %}
+                <blockquote style="margin: 0; color: #e4e4e7; font-size: 0.82rem;">"{{ ev.payload.answer_snippet }}"</blockquote>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Length: {{ ev.payload.answer_length }} chars &bull; Question: <code>{{ ev.payload.question_id[:8] }}</code></div>
+              {% elif ev.event_type == 'SECURITY_INJECTION_DETECTED' %}
+                <div style="color: #f87171; font-weight: 600;">Adversarial Prompt Injection / Evasion Flagged:</div>
+                <ul style="margin: 0.25rem 0 0.5rem 1.25rem; padding: 0; font-size: 0.8rem; color: #fca5a5;">
+                  {% for f in ev.payload.adversarial_flags %}
+                  <li>{{ f }}</li>
+                  {% endfor %}
+                </ul>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Answer snippet: <code>{{ ev.payload.answer_snippet }}</code></div>
+              {% elif ev.event_type == 'GRADE_RECORDED' %}
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge badge-success">Score: {{ ev.payload.raw_score }} / 4</span>
+                  {% if ev.payload.cached %}<span class="badge badge-neutral" style="font-size: 0.65rem;">Cache Hit</span>{% endif %}
+                  {% if ev.payload.latency_ms %}<span style="font-size: 0.75rem; color: var(--text-muted);">{{ ev.payload.latency_ms|round(1) }}ms</span>{% endif %}
+                </div>
+                {% if ev.payload.feedback %}
+                <div style="font-size: 0.8rem; color: #a1a1aa; margin-top: 0.25rem;">{{ ev.payload.feedback }}</div>
+                {% endif %}
+              {% elif ev.event_type == 'MASTERY_SYNCHRONIZED' %}
+                <div style="font-size: 0.82rem; color: #34d399;">
+                  Effective Score: <strong>{{ ev.payload.effective_score }}</strong> &bull; Aggregate: {{ ev.payload.aggregate_score }} &bull; Confidence: {{ (ev.payload.confidence * 100)|round(1) }}%
+                  {% if ev.payload.is_eligible %}
+                  <span class="badge badge-success" style="font-size: 0.65rem; margin-left: 0.35rem;">Eligible for Tailoring</span>
+                  {% endif %}
+                </div>
+              {% elif ev.event_type == 'SESSION_COMPLETED' %}
+                <div style="color: #34d399; font-weight: 600;">
+                  Session finalized: {{ ev.payload.total_turns }} turns answered &bull; Average Score: {{ ev.payload.average_score }} / 4 &bull; Duration: {{ ev.payload.duration_seconds }}s
+                </div>
+              {% else %}
+                <pre style="margin: 0; font-size: 0.75rem; color: var(--text-muted); background: transparent; padding: 0;">{{ ev.payload }}</pre>
+              {% endif %}
+            </div>
+          </td>
+          <td style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">
+            {{ ev.client_ip or '127.0.0.1' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

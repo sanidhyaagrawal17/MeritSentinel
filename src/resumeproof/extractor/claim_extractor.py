@@ -138,11 +138,88 @@ def detect_section_header(text: str) -> Optional[str]:
         return "SKILLS"
     if clean in ("WORK EXPERIENCE", "EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE", "INTERNSHIP", "INTERNSHIPS"):
         return "EXPERIENCE"
-    if clean in ("COURSEWORK & COMPETITIONS", "COMPETITIONS & COURSEWORK", "COMPETITIONS", "ACHIEVEMENTS", "HONORS & AWARDS", "AWARDS", "CERTIFICATIONS"):
+    if clean in (
+        "COURSEWORK & COMPETITIONS", "COMPETITIONS & COURSEWORK", "COMPETITIONS",
+        "ACHIEVEMENTS", "HONORS & AWARDS", "AWARDS", "CERTIFICATIONS",
+        "CERTIFICATIONS & ACHIEVEMENTS", "CERTIFICATIONS AND ACHIEVEMENTS",
+        "ACHIEVEMENTS & CERTIFICATIONS", "TRAINING & CERTIFICATIONS",
+        "CERTIFICATIONS & TRAINING", "COURSEWORK & PARTICIPATION"
+    ):
         return "ACHIEVEMENTS"
     if clean in ("SUMMARY", "PROFESSIONAL SUMMARY", "PROFILE"):
         return "SUMMARY"
     return None
+
+DEFAULT_SKILL_CATEGORIES = {
+    # Programming Languages
+    "python": "Programming Languages",
+    "java": "Programming Languages",
+    "c++": "Programming Languages",
+    "c": "Programming Languages",
+    "javascript": "Programming Languages",
+    "typescript": "Programming Languages",
+    "sql": "Programming Languages",
+    "go": "Programming Languages",
+    "rust": "Programming Languages",
+    "c#": "Programming Languages",
+    "ruby": "Programming Languages",
+    "php": "Programming Languages",
+    # Web & Frameworks
+    "fastapi": "Web & Frameworks",
+    "react.js": "Web & Frameworks",
+    "react": "Web & Frameworks",
+    "node.js": "Web & Frameworks",
+    "express.js": "Web & Frameworks",
+    "next.js": "Web & Frameworks",
+    "restful apis": "Web & Frameworks",
+    "rest apis": "Web & Frameworks",
+    "html": "Web & Frameworks",
+    "html5": "Web & Frameworks",
+    "css": "Web & Frameworks",
+    "css3": "Web & Frameworks",
+    "flask": "Web & Frameworks",
+    "django": "Web & Frameworks",
+    "tailwind": "Web & Frameworks",
+    "bootstrap": "Web & Frameworks",
+    "jinja2": "Web & Frameworks",
+    "htmx": "Web & Frameworks",
+    # Databases & Storage
+    "sqlite": "Databases & Tools",
+    "mysql": "Databases & Tools",
+    "postgresql": "Databases & Tools",
+    "redis": "Databases & Tools",
+    "mongodb": "Databases & Tools",
+    # Developer Tools & Platforms
+    "git": "Databases & Tools",
+    "github": "Databases & Tools",
+    "postman": "Databases & Tools",
+    "vs code": "Databases & Tools",
+    "docker": "Databases & Tools",
+    "linux": "Databases & Tools",
+    "locust": "Databases & Tools",
+    "pytest": "Databases & Tools",
+    # Core Fundamentals
+    "object-oriented programming (oop)": "Core Fundamentals",
+    "oop": "Core Fundamentals",
+    "data structures & algorithms": "Core Fundamentals",
+    "dsa": "Core Fundamentals",
+    "dbms": "Core Fundamentals",
+    "computer networks": "Core Fundamentals",
+    "operating systems": "Core Fundamentals",
+    # AI Development Tools
+    "google antigravity (gemini)": "AI Development Tools",
+    "google antigravity": "AI Development Tools",
+    "gemini": "AI Development Tools",
+}
+
+def infer_skill_category(line_text: str, skill_name: str) -> str:
+    """Infers skill category from line prefix (e.g. 'Web & Frameworks:') or standard dictionary."""
+    if ":" in line_text:
+        prefix = line_text.split(":", 1)[0].lstrip("#*•-► ").strip()
+        if 1 <= len(prefix.split()) <= 6 and not detect_section_header(prefix):
+            return prefix
+    clean_k = skill_name.strip().lower()
+    return DEFAULT_SKILL_CATEGORIES.get(clean_k, "Technical Stack & Tools")
 
 def _split_skill_text(raw_text: str) -> list[str]:
     """Splits a skill text (e.g. 'Languages: Python, SQL' or 'FastAPI, SQLite, Sockets') into individual skill names."""
@@ -191,7 +268,11 @@ def _map_resume_lines(parse_result: ParseResult) -> tuple[dict[int, str], dict[i
 
             # Heading lines never end with a period, and are not bullet points
             if not is_bullet and not ends_with_period:
-                if " - " in txt and (re.search(r"\b20\d\d\b", txt) or len(txt.split()) <= 12):
+                if "|" in txt:
+                    # Pipe-delimited project heading e.g. "NetPass Gateway | FastAPI, React.js, SQLite, JWT | Jan 2026 - Jun 2026"
+                    proj_name = txt.split("|")[0].strip()
+                    current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
+                elif " - " in txt and (re.search(r"\b20\d\d\b", txt) or len(txt.split()) <= 12):
                     proj_name = txt.split(" - ")[0].strip()
                     current_project = re.sub(r"[^a-zA-Z0-9]+", "-", proj_name.lower()).strip("-")
                 elif "(" in txt and (txt.endswith(":") or not txt.startswith("-")):
@@ -289,7 +370,10 @@ def deduplicate_claims(claims: list[Claim]) -> list[Claim]:
         ):
             continue
         # Project title lines: e.g. "GameData MCP - Video Game Analytics & MCP Query Server 2026"
-        if " - " in t and any(yr in t for yr in ["2023", "2024", "2025", "2026", "2027"]) and len(t.split()) <= 12 and not any(v in t.lower() for v in ["built", "implemented", "trained", "developed", "served", "delivered", "taught"]):
+        if c.claim_type not in (ClaimType.ACHIEVEMENT, ClaimType.TOOL) and " - " in t and any(yr in t for yr in ["2023", "2024", "2025", "2026", "2027"]) and len(t.split()) <= 12 and not any(v in t.lower() for v in ["built", "implemented", "trained", "developed", "served", "delivered", "taught", "hackathon", "innovent", "teams", "finalist", "participant"]):
+            continue
+        # Pipe-delimited project or experience headings (e.g. "NetPass Gateway | FastAPI... | Jan 2026 - Jun 2026")
+        if "|" in t and any(yr in t for yr in ["2023", "2024", "2025", "2026", "2027"]) and c.claim_type != ClaimType.TOOL:
             continue
         # Tech stack lines falsely emitted as project_metric or experience_claim
         if is_tech_stack_line(t) and c.claim_type != ClaimType.TOOL:
@@ -314,33 +398,48 @@ def deduplicate_claims(claims: list[Claim]) -> list[Claim]:
             no_subfragments.append(c)
 
     # Step 3: Text uniqueness and type disambiguation
-    # Process full bullet sentences, tool claims, and skills first so redundant short fragments are caught
+    # Process achievements and project bullets first so skills don't steal certifications
     def _claim_priority(c: Claim) -> int:
-        if len(c.text.split()) > 6:
+        if c.claim_type == ClaimType.ACHIEVEMENT:
             return 0
-        if c.claim_type == ClaimType.TOOL:
+        if len(c.text.split()) > 6:
             return 1
-        if c.claim_type == ClaimType.SKILL:
+        if c.claim_type == ClaimType.TOOL:
             return 2
-        return 3
+        if c.claim_type == ClaimType.SKILL:
+            return 3
+        return 4
 
     sorted_candidates = sorted(no_subfragments, key=_claim_priority)
     unique: list[Claim] = []
     seen_keys: set[tuple] = set()
     seen_tools_metrics: set[tuple] = set()
+    seen_achievement_texts: set[str] = set()
 
     for c in sorted_candidates:
-        clean_text = c.text.strip().lower()
-        key = (c.claim_type, c.project_id, clean_text)
+        clean_text = re.sub(r"^[-*•►·▪\s]+", "", c.text).strip()
+        if c.claim_type == ClaimType.ACHIEVEMENT:
+            clean_text = re.sub(r"^(?:competitions|certifications|training|achievements)\s*:\s*", "", clean_text, flags=re.IGNORECASE).strip()
+        c.text = clean_text
+        clean_lower = clean_text.lower()
+
+        # If already seen as an achievement, drop duplicate skill claim
+        if c.claim_type == ClaimType.SKILL and clean_lower in seen_achievement_texts:
+            continue
+
+        key = (c.claim_type, c.project_id, clean_lower)
         if key in seen_keys:
             continue
 
+        if c.claim_type == ClaimType.ACHIEVEMENT:
+            seen_achievement_texts.add(clean_lower)
+
         # If a single tool name (e.g. "FastAPI", "JWT", "PyTorch") already exists as SKILL or TOOL, don't duplicate
         if c.claim_type in (ClaimType.EXPERIENCE_CLAIM, ClaimType.PROJECT_METRIC) and len(c.text.split()) <= 4:
-            if any(other.text.strip().lower() == clean_text for other in unique):
+            if any(other.text.strip().lower() == clean_lower for other in unique):
                 continue
             # If it's a metric or percentage fragment matching an already accepted bullet sentence
-            if any(clean_text in other.text.strip().lower() for other in unique if len(other.text.split()) > 6):
+            if any(clean_lower in other.text.strip().lower() for other in unique if len(other.text.split()) > 6):
                 continue
 
         # If tools and metrics are both non-empty and identical to a previous claim for this project, consider duplicate
@@ -356,6 +455,213 @@ def deduplicate_claims(claims: list[Claim]) -> list[Claim]:
         unique.append(c)
 
     return unique
+
+def _enrich_and_ground_profile_facts(
+    facts: list[ProfileFact],
+    parse_result: ParseResult,
+    user_id: str,
+    persona_id: Optional[str],
+    has_experience_section: bool,
+) -> list[ProfileFact]:
+    """Enriches and grounds profile facts deterministically against parse_result lines."""
+    existing_types = {f.fact_type: f for f in facts}
+
+    # 1. Candidate Name: Ground in top line
+    if parse_result.lines:
+        first_line = parse_result.lines[0].text.strip()
+        if re.match(r"^[A-Za-z\s\.\-]+$", first_line) and 1 <= len(first_line.split()) <= 4:
+            clean_name = first_line.title()
+            if ProfileFactType.NAME in existing_types:
+                existing_types[ProfileFactType.NAME].value = clean_name
+            else:
+                f_name = ProfileFact(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    persona_id=persona_id,
+                    fact_type=ProfileFactType.NAME,
+                    value=clean_name,
+                    source_line=1,
+                    source_page=1,
+                    is_confirmed=False
+                )
+                facts.insert(0, f_name)
+                existing_types[ProfileFactType.NAME] = f_name
+
+    # 2. Email, Phone, Location from top lines (first 5 lines)
+    for line in parse_result.lines[:5]:
+        txt = line.text.strip()
+        # Email
+        if ProfileFactType.EMAIL not in existing_types:
+            em = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", txt)
+            if em:
+                f_em = ProfileFact(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    persona_id=persona_id,
+                    fact_type=ProfileFactType.EMAIL,
+                    value=em.group(0),
+                    source_line=line.line_number,
+                    source_page=1,
+                    is_confirmed=False
+                )
+                facts.append(f_em)
+                existing_types[ProfileFactType.EMAIL] = f_em
+
+        # Phone
+        if ProfileFactType.PHONE not in existing_types:
+            ph = re.search(r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3,5}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}", txt)
+            if ph and len(re.sub(r"\D", "", ph.group(0))) >= 10:
+                f_ph = ProfileFact(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    persona_id=persona_id,
+                    fact_type=ProfileFactType.PHONE,
+                    value=ph.group(0).strip(),
+                    source_line=line.line_number,
+                    source_page=1,
+                    is_confirmed=False
+                )
+                facts.append(f_ph)
+                existing_types[ProfileFactType.PHONE] = f_ph
+
+        # Location
+        if ProfileFactType.LOCATION not in existing_types and ("|" in txt or "," in txt):
+            parts = [p.strip() for p in re.split(r"[|]+", txt)]
+            for p in parts:
+                p_lower = p.lower()
+                if any(kw in p_lower for kw in ["india", "madhya pradesh", "indore", "delhi", "bangalore", "mumbai", "usa", "ca", "ny"]) or ("," in p and len(p.split()) <= 6):
+                    if not re.search(r"@[a-zA-Z0-9-]+\.", p) and not re.search(r"\d{10}", p) and "http" not in p_lower and "linkedin" not in p_lower and "github" not in p_lower:
+                        f_loc = ProfileFact(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            fact_type=ProfileFactType.LOCATION,
+                            value=p,
+                            source_line=line.line_number,
+                            source_page=1,
+                            is_confirmed=False
+                        )
+                        facts.append(f_loc)
+                        existing_types[ProfileFactType.LOCATION] = f_loc
+                        break
+
+    # 3. Education facts
+    in_edu = False
+    for line in parse_result.lines:
+        sec = detect_section_header(line.text)
+        if sec:
+            in_edu = (sec == "EDUCATION")
+            continue
+        if in_edu:
+            txt = line.text.strip()
+            if "|" in txt:
+                parts = [p.strip() for p in txt.split("|")]
+                for p in parts:
+                    p_lower = p.lower()
+                    if ("university" in p_lower or "college" in p_lower or "institute" in p_lower or "school" in p_lower) and ProfileFactType.EDUCATION_INSTITUTION not in existing_types:
+                        f_inst = ProfileFact(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            fact_type=ProfileFactType.EDUCATION_INSTITUTION,
+                            value=p,
+                            source_line=line.line_number,
+                            source_page=1,
+                            is_confirmed=False
+                        )
+                        facts.append(f_inst)
+                        existing_types[ProfileFactType.EDUCATION_INSTITUTION] = f_inst
+                    elif any(d in p_lower for d in ["b.tech", "btech", "b.s.", "b.e.", "m.s.", "bachelor", "master"]) and ProfileFactType.DEGREE not in existing_types:
+                        f_deg = ProfileFact(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            fact_type=ProfileFactType.DEGREE,
+                            value=p,
+                            source_line=line.line_number,
+                            source_page=1,
+                            is_confirmed=False
+                        )
+                        facts.append(f_deg)
+                        existing_types[ProfileFactType.DEGREE] = f_deg
+                    elif ("cgpa" in p_lower or "gpa" in p_lower) and ProfileFactType.CGPA not in existing_types:
+                        val = re.sub(r"^(?:cgpa|gpa)\s*:\s*", "", p, flags=re.IGNORECASE).strip()
+                        f_gpa = ProfileFact(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            fact_type=ProfileFactType.CGPA,
+                            value=val if val else p,
+                            source_line=line.line_number,
+                            source_page=1,
+                            is_confirmed=False
+                        )
+                        facts.append(f_gpa)
+                        existing_types[ProfileFactType.CGPA] = f_gpa
+                    elif any(yr in p for yr in ["2024", "2025", "2026", "2027", "2028"]) and ProfileFactType.GRADUATION_DATE not in existing_types:
+                        val = p.split("-")[-1].strip() if "-" in p else p
+                        val = re.sub(r"^(?:expected\s+)?", "", val, flags=re.IGNORECASE).strip()
+                        f_dt = ProfileFact(
+                            id=str(uuid.uuid4()),
+                            user_id=user_id,
+                            persona_id=persona_id,
+                            fact_type=ProfileFactType.GRADUATION_DATE,
+                            value=val,
+                            source_line=line.line_number,
+                            source_page=1,
+                            is_confirmed=False
+                        )
+                        facts.append(f_dt)
+                        existing_types[ProfileFactType.GRADUATION_DATE] = f_dt
+
+    # 4. Experience facts (Employer Name & Dates)
+    if has_experience_section:
+        in_exp = False
+        for line in parse_result.lines:
+            sec = detect_section_header(line.text)
+            if sec:
+                in_exp = (sec == "EXPERIENCE")
+                continue
+            if in_exp:
+                txt = line.text.strip()
+                if "|" in txt and not txt.startswith(("-", "*", "•", "►")):
+                    parts = [p.strip() for p in txt.split("|")]
+                    if len(parts) >= 2:
+                        emp_name = parts[0]
+                        if ProfileFactType.EMPLOYER_NAME in existing_types:
+                            # Synchronize with resume line if existing fact has typos or lowercase
+                            if existing_types[ProfileFactType.EMPLOYER_NAME].value.lower() == emp_name.lower() or "roa" in existing_types[ProfileFactType.EMPLOYER_NAME].value.lower():
+                                existing_types[ProfileFactType.EMPLOYER_NAME].value = emp_name
+                        else:
+                            f_emp = ProfileFact(
+                                id=str(uuid.uuid4()),
+                                user_id=user_id,
+                                persona_id=persona_id,
+                                fact_type=ProfileFactType.EMPLOYER_NAME,
+                                value=emp_name,
+                                source_line=line.line_number,
+                                source_page=1,
+                                is_confirmed=False
+                            )
+                            facts.append(f_emp)
+                            existing_types[ProfileFactType.EMPLOYER_NAME] = f_emp
+
+                        if len(parts) >= 3 and ProfileFactType.EMPLOYMENT_DATES not in existing_types:
+                            f_dates = ProfileFact(
+                                id=str(uuid.uuid4()),
+                                user_id=user_id,
+                                persona_id=persona_id,
+                                fact_type=ProfileFactType.EMPLOYMENT_DATES,
+                                value=parts[-1],
+                                source_line=line.line_number,
+                                source_page=1,
+                                is_confirmed=False
+                            )
+                            facts.append(f_dates)
+                            existing_types[ProfileFactType.EMPLOYMENT_DATES] = f_dates
+                        break
+
+    return facts
 
 def extract_from_resume(
     parse_result: ParseResult,
@@ -428,9 +734,17 @@ def extract_from_resume(
 
         # Check section context
         in_skills_section = item.source_line is not None and line_sections.get(item.source_line) in ("SKILLS", "TECHNICAL SKILLS")
-        in_project_or_exp_section = item.source_line is not None and line_sections.get(item.source_line) in (
-            "PROJECTS", "EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"
+        in_project_section = item.source_line is not None and line_sections.get(item.source_line) == "PROJECTS"
+        in_experience_section = item.source_line is not None and line_sections.get(item.source_line) in (
+            "EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "PROFESSIONAL EXPERIENCE"
         )
+        in_achievements_section = item.source_line is not None and line_sections.get(item.source_line) in (
+            "ACHIEVEMENTS", "CERTIFICATIONS & ACHIEVEMENTS", "COURSEWORK & COMPETITIONS", "COMPETITIONS"
+        )
+        in_project_or_exp_section = in_project_section or in_experience_section
+
+        # Strip leading bullet symbols from text
+        clean_item_text = re.sub(r"^[-*•►·▪\s]+", "", clean_item_text).strip()
 
         # Associate project_id and exact source_line from parse_result
         project_id = item.project_id
@@ -439,7 +753,7 @@ def extract_from_resume(
         if project_id:
             project_id = re.sub(r"[^a-zA-Z0-9]+", "-", project_id.lower()).strip("-")
 
-        claim_words = set(re.findall(r"[a-zA-Z0-9]+", item.text.lower()))
+        claim_words = set(re.findall(r"[a-zA-Z0-9]+", clean_item_text.lower()))
         best_line_num = None
         best_overlap = 0
         for line in parse_result.lines:
@@ -456,6 +770,18 @@ def extract_from_resume(
         elif item.source_line is not None and item.source_line in line_projects:
             project_id = line_projects[item.source_line]
 
+        # Enforce section grounding on claim types
+        if in_achievements_section:
+            ctype = ClaimType.ACHIEVEMENT
+            project_id = None
+            clean_item_text = re.sub(r"^(?:competitions|certifications|training|achievements)\s*:\s*", "", clean_item_text, flags=re.IGNORECASE).strip()
+        elif in_project_section:
+            if ctype != ClaimType.TOOL:
+                ctype = ClaimType.PROJECT_METRIC
+        elif in_experience_section:
+            ctype = ClaimType.EXPERIENCE_CLAIM
+            project_id = None
+
         # Filter out standalone project titles or tech-stack lines falsely emitted as project_metric
         if in_project_or_exp_section or project_id:
             # If item is just a project heading
@@ -465,7 +791,9 @@ def extract_from_resume(
             if ctype == ClaimType.TOOL and project_id:
                 pass
             elif ctype == ClaimType.SKILL:
-                if item.metric_values or any(char.isdigit() for char in item.text):
+                if project_id:
+                    ctype = ClaimType.PROJECT_METRIC
+                elif item.metric_values or any(char.isdigit() for char in clean_item_text):
                     ctype = ClaimType.PROJECT_METRIC
                 else:
                     ctype = ClaimType.EXPERIENCE_CLAIM
@@ -473,7 +801,7 @@ def extract_from_resume(
                 continue
 
         # CRITICAL INVARIANT: split skill lines into one skill claim per skill
-        if in_skills_section or (ctype == ClaimType.SKILL and not project_id and not in_project_or_exp_section):
+        if not in_achievements_section and (in_skills_section or (ctype == ClaimType.SKILL and not project_id and not in_project_or_exp_section)):
             # Split skill line into individual skills
             skills_list = _split_skill_text(item.text)
             if not skills_list and item.tools:
@@ -481,10 +809,15 @@ def extract_from_resume(
             if not skills_list:
                 skills_list = [item.text.strip()]
 
+            orig_line_text = ""
+            if item.source_line and parse_result and 1 <= item.source_line <= len(parse_result.lines):
+                orig_line_text = parse_result.lines[item.source_line - 1].text
+
             for skill_name in skills_list:
                 if detect_section_header(skill_name) or skill_name.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS"):
                     continue
                 claim_id = str(uuid.uuid4())
+                category = infer_skill_category(orig_line_text or item.text, skill_name)
                 audit = ClaimAudit(
                     extractor_text=skill_name,
                     extractor_tools=[skill_name],
@@ -502,6 +835,7 @@ def extract_from_resume(
                     metric_values=[],
                     source_line=item.source_line,
                     source_page=1,
+                    raw_sentence=orig_line_text or item.text,
                     status=ClaimStatus.EXTRACTED,
                     audit=audit
                 ))
@@ -531,16 +865,18 @@ def extract_from_resume(
             audit=audit
         ))
 
-    # Fallback: ensure all skills listed in resume Skills sections are parsed as individual skill claims
+    # Fallback: ensure all skills listed in resume Skills sections are parsed as individual skill claims with category
     for line in parse_result.lines:
         txt_heading = line.text.lstrip("#*•-► ").strip().upper().rstrip(":")
         if detect_section_header(txt_heading) or txt_heading in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS", "NETWORKING & BACKEND", "DISTRIBUTED SYSTEMS", "ML & DATA"):
             continue
         if line_sections.get(line.line_number) in ("SKILLS", "TECHNICAL SKILLS"):
             split_skills = _split_skill_text(line.text)
+            line_cat = infer_skill_category(line.text, "")
             for skill_name in split_skills:
                 if detect_section_header(skill_name) or skill_name.upper() in ("SKILLS", "TECHNICAL SKILLS", "LANGUAGES", "TOOLS"):
                     continue
+                skill_cat = line_cat if line_cat != "Technical Stack & Tools" else infer_skill_category(line.text, skill_name)
                 if not any(c.claim_type == ClaimType.SKILL and c.text.lower() == skill_name.lower() for c in claims):
                     cid = str(uuid.uuid4())
                     claims.append(Claim(
@@ -554,6 +890,7 @@ def extract_from_resume(
                         metric_values=[],
                         source_line=line.line_number,
                         source_page=1,
+                        raw_sentence=line.text,
                         status=ClaimStatus.EXTRACTED,
                         audit=ClaimAudit(
                             extractor_text=skill_name,
@@ -563,13 +900,18 @@ def extract_from_resume(
                         )
                     ))
 
-    # Project Stack-Line Tools: Extract tools listed in project tech-stack lines
+    # Project Stack-Line Tools: Extract tools listed in project tech-stack lines or pipe headings
     for line in parse_result.lines:
         sec = line_sections.get(line.line_number)
         if sec == "PROJECTS":
             proj_id = line_projects.get(line.line_number)
-            if proj_id and is_tech_stack_line(line.text):
-                stack_tools = split_tech_stack_line(line.text)
+            if proj_id:
+                stack_tools = []
+                if is_tech_stack_line(line.text):
+                    stack_tools = split_tech_stack_line(line.text)
+                elif "|" in line.text and len(line.text.split("|")) >= 2:
+                    parts = line.text.split("|")
+                    stack_tools = [t.strip() for t in re.split(r"[,;]+", parts[1]) if t.strip() and len(t.strip()) >= 2]
                 for tool_name in stack_tools:
                     # Avoid adding if identical tool claim already exists for this project
                     if not any(c.project_id == proj_id and c.claim_type == ClaimType.TOOL and c.text.lower() == tool_name.lower() for c in claims):
@@ -625,7 +967,7 @@ def extract_from_resume(
                 )
                 if not already_captured:
                     proj_id = line_projects.get(line.line_number)
-                    ctype = ClaimType.PROJECT_METRIC if any(ch.isdigit() for ch in clean_txt) else ClaimType.EXPERIENCE_CLAIM
+                    ctype = ClaimType.PROJECT_METRIC
                     claims.append(Claim(
                         id=str(uuid.uuid4()),
                         user_id=user_id,
@@ -661,7 +1003,7 @@ def extract_from_resume(
                     for c in claims if c.claim_type != ClaimType.SKILL
                 )
                 if not already_captured:
-                    ctype = ClaimType.PROJECT_METRIC if any(ch.isdigit() for ch in clean_txt) else ClaimType.EXPERIENCE_CLAIM
+                    ctype = ClaimType.EXPERIENCE_CLAIM
                     claims.append(Claim(
                         id=str(uuid.uuid4()),
                         user_id=user_id,
@@ -685,6 +1027,31 @@ def extract_from_resume(
         elif sec in ("ACHIEVEMENTS", "COURSEWORK & COMPETITIONS", "COMPETITIONS"):
             clean_txt = re.sub(r"^[-*•►]\s*", "", txt).strip()
             if len(clean_txt) >= 10:
+                if any(clean_txt.lower().startswith(p) for p in ["certifications:", "competitions:", "training:", "achievements:"]):
+                    prefix, rest = clean_txt.split(":", 1)
+                    sub_items = [it.strip() for it in re.split(r"[|;]+", rest) if it.strip()]
+                    for sub in sub_items:
+                        if len(sub) >= 3 and not any(sub.lower() == c.text.lower() for c in claims):
+                            claims.append(Claim(
+                                id=str(uuid.uuid4()),
+                                user_id=user_id,
+                                persona_id=persona_id,
+                                project_id=None,
+                                claim_type=ClaimType.ACHIEVEMENT,
+                                text=sub,
+                                tools=[],
+                                metric_values=[],
+                                source_line=line.line_number,
+                                source_page=1,
+                                status=ClaimStatus.EXTRACTED,
+                                audit=ClaimAudit(
+                                    extractor_text=sub,
+                                    extractor_tools=[],
+                                    extractor_metrics=[],
+                                    action_taken=ClaimStatus.EXTRACTED
+                                )
+                            ))
+                    continue
                 bullet_words = set(re.findall(r"[a-zA-Z0-9]+", clean_txt.lower()))
                 already_captured = any(
                     len(bullet_words.intersection(set(re.findall(r"[a-zA-Z0-9]+", c.text.lower())))) >= max(3, len(bullet_words) * 3 // 4)
@@ -724,6 +1091,27 @@ def extract_from_resume(
 
     # Apply strict deduplication (same source line or same tools + metrics, preserving individual skills)
     deduped_claims = deduplicate_claims(filtered_claims)
+
+    # Ground and enrich profile facts against parse_result lines
+    facts = _enrich_and_ground_profile_facts(
+        facts=facts,
+        parse_result=parse_result,
+        user_id=user_id,
+        persona_id=persona_id,
+        has_experience_section=has_experience_section,
+    )
+
+    # Auto-extract tools and metrics for claims
+    from resumeproof.verifier.strict_verifier import extract_tools_from_text, extract_numbers_and_metrics
+    for c in deduped_claims:
+        if not c.tools and c.text:
+            extracted_t = extract_tools_from_text(c.text)
+            if extracted_t:
+                c.tools = extracted_t
+        if not c.metric_values and c.text:
+            extracted_m = extract_numbers_and_metrics(c.text)
+            if extracted_m:
+                c.metric_values = extracted_m
 
     return facts, deduped_claims
 

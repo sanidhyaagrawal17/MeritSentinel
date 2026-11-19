@@ -74,11 +74,14 @@ for m in misclassified:
 # Save results
 out_data = {
     "date": "2026-10-26",
+    "embedding_model": PINNED_EMBEDDING_MODEL,
     "cutoffs": {"strong": STRONG_CUTOFF, "partial": PARTIAL_CUTOFF},
     "metrics": metrics,
     "means": {"strong": mean_strong, "partial": mean_partial, "gap": mean_gap},
     "misclassified_count": len(misclassified),
     "total_pairs": len(pairs),
+    "detailed_results": results,
+    "misclassified_pairs": misclassified,
 }
 Path("results/fresh_40_matcher_results.json").write_text(json.dumps(out_data, indent=2), encoding="utf-8")
 print("\nSaved output to results/fresh_40_matcher_results.json")
